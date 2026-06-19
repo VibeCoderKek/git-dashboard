@@ -17,8 +17,8 @@ main        ← stable releases only, tagged milestones
 ```
 
 Every guardrail, every warning, and every default in the dashboard is designed around this model. You cannot accidentally commit to `main` or `dev`. You cannot push without a lint check. You cannot abandon a branch silently.
-
 The dashboard also spans **multiple projects** (Option 27) and can now **bootstrap a brand-new repo from zero** (Option 31) and **sign in to GitHub with saved credentials** (Option 30) — so the whole lifecycle, from empty folder to pushed milestone, stays inside one tool.
+
 
 ---
 
@@ -167,6 +167,7 @@ Option 29  →  shows current SHA, offers to create a branch from it
 ```
 
 ### Jumping between projects
+<<<<<<< Updated upstream
 
 If you work across several repos from one phone (e.g. Vector, AuraSpace, git-dashboard itself), Option 27 opens a project picker backed by a registry of known repos. Selecting one `cd`s the dashboard's working directory into that project and reloads its branch/status/config context — no need to exit and re-run `git-dash` from a different folder.
 
@@ -175,6 +176,10 @@ If you work across several repos from one phone (e.g. Vector, AuraSpace, git-das
 ```
 Option 30  →  enter GitHub username, repo name, and a Personal Access Token
 ```
+=======
+
+If you work across several repos from one phone (e.g. Vector, AuraSpace, git-dashboard itself), Option 27 opens a project picker backed by a registry of known repos. Selecting one `cd`s the dashboard's working directory into that project and reloads its branch/status/config context — no need to exit and re-run `git-dash` from a different folder.
+>>>>>>> Stashed changes
 
 The token is entered with hidden input (never echoed or logged). The dashboard:
 
@@ -218,7 +223,11 @@ cd ~/Vector          # or ~/AuraSpace, ~/proj, etc.
 git-dash             # dashboard opens in context of that repo
 ```
 
+<<<<<<< Updated upstream
 The dashboard reads `.git/dashboard_config.json` inside whichever repo you're in — so last-used commit scope and GitHub username/repo are per-project. Once you're in, Option 27 lets you hop to any other registered project without quitting and re-`cd`ing manually.
+=======
+The dashboard reads `.git/dashboard_config.json` inside whichever repo you're in — so last-used commit scope is per-project. Once you're in, Option 27 lets you hop to any other registered project without quitting and re-`cd`ing manually.
+>>>>>>> Stashed changes
 
 ### Worktrees (multi-project parallel work)
 
@@ -239,14 +248,13 @@ The dashboard stores per-repo config in `.git/dashboard_config.json` (excluded f
 | Key | Description |
 |-----|-------------|
 | `last_scope` | Last commit scope used (pre-fills the scope prompt) |
+<<<<<<< Updated upstream
 | `github_username` | Set by option 30 — pre-fills the username prompt next time |
 | `github_repo` | Set by option 30 — pre-fills the repo name prompt next time |
+=======
+>>>>>>> Stashed changes
 
-Global git config set by the dashboard:
-
-```
-credential.helper = store   ← set by option 30, persists PAT across sessions
-```
+Project registry data for Option 27 (known repo paths) is managed separately by `registry.py` rather than the per-repo dashboard config.
 
 Project registry data for Option 27 (known repo paths) is managed separately by `registry.py` rather than the per-repo dashboard config.
 
@@ -264,6 +272,7 @@ Project registry data for Option 27 (known repo paths) is managed separately by 
 - **JS/TS lint integration** — run `eslint` or `tsc --noEmit` as pre-push check for React Native / Expo projects alongside `py_compile`
 - **Commit template library** — save and recall frequently used commit message patterns
 - **Remote branch manager** — list remote branches, fetch individual ones, set upstream tracking
+- **GitHub setup helper** — guided remote + credential setup directly from the dashboard
 
 ### Long-term
 - **GitHub CLI integration** — create PRs, view open issues, and merge PRs directly from the dashboard without leaving Termux
