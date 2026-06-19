@@ -1273,6 +1273,17 @@ class Dashboard:
             print(f"{C.GRAY_DIM}   You're now on 'dev'. Use Option 6 to start a feature branch,{C.RESET}")
             print(f"{C.GRAY_DIM}   or Option 30 to connect a GitHub remote.{C.RESET}")
             self.refresh()
+
+            register_fn = getattr(registry, "register_project", None)
+            if callable(register_fn):
+                if confirm("Register this project for Option 27 (switch project)?"):
+                    try:
+                        register_fn(os.getcwd())
+                        print(f"{C.GREEN}✅ Registered with project switcher.{C.RESET}")
+                    except Exception as e:
+                        print(f"{C.RED}❌ Registration failed: {e}{C.RESET}")
+            else:
+                print(f"{C.GRAY_DIM}ℹ️  registry.py has no register_project() function — add this project to the switcher manually.{C.RESET}")
         pause()
 
     def _check_empty_branch_on_exit(self):
