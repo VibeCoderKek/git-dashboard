@@ -805,6 +805,7 @@ class Dashboard:
         print(f"{C.YELLOW}📦 All files edited. Staging changes...{C.RESET}")
         git("add", ".")
         print(f"{C.GREEN}✅ Changes staged! Use Option 3 to finalize the merge commit.{C.RESET}")
+        toast("Conflicts staged.", icon="🩹")
         pause()
 
     def action_squash(self):
@@ -921,6 +922,7 @@ class Dashboard:
             print(f"{C.GREEN}✅ Successfully pulled {self.branch}.{C.RESET}")
             if res.out:
                 print(res.out)
+            toast("Pull complete.", icon="⬇️")
         pause()
 
     def action_fetch_prune(self):
@@ -1076,6 +1078,7 @@ class Dashboard:
         with open(gitignore_path, "a") as f:
             f.write(f"\n{pattern}\n")
         print(f"{C.GREEN}✅ Added '{pattern}' to .gitignore{C.RESET}")
+        toast(f"Added '{pattern}' to .gitignore", icon="📄")
         pause()
 
     def action_commit_search(self):
