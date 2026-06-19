@@ -232,6 +232,19 @@ def _check_scope_mismatch(scope, threshold=0.5):
     return mismatched, all_files
 
 
+def _is_branch_merged(branch_name):
+    """
+    Return True if branch_name is merged into dev OR main.
+    Checks both protected branches so hotfix-style branches merged
+    only into main aren't incorrectly flagged as unmerged.
+    """
+    merged_dev = git("branch", "--merged", "dev", "--list", branch_name)
+    if merged_dev.out:
+        return True
+    merged_main = git("branch", "--merged", "main", "--list", branch_name)
+    return bool(merged_main.out)
+
+
 def _lint_python_files():
     """
     Run py_compile over every tracked .py file.
@@ -703,8 +716,7 @@ class Dashboard:
 
         print(f"{C.YELLOW}🌿 Branches:{C.RESET}")
         for b in deletable:
-            merged = git("branch", "--merged", "dev", "--list", b)
-            tag = f"{C.GREEN}(merged to dev){C.RESET}" if merged.out else f"{C.ORANGE}(unmerged){C.RESET}"
+            tag = f"{C.GREEN}(merged){C.RESET}" if _is_branch_merged(b) else f"{C.ORANGE}(unmerged){C.RESET}"
             print(f" - {b} {tag}")
 
         name = input("\nBranch to delete (blank to cancel): ").strip()
@@ -720,9 +732,8 @@ class Dashboard:
             pause()
             return
 
-        merged = git("branch", "--merged", "dev", "--list", name)
-        if not merged.out:
-            if not confirm(f"⚠️  '{name}' is NOT merged into dev. Force delete anyway?"):
+        if not _is_branch_merged(name):
+            if not confirm(f"⚠️  '{name}' is NOT merged into dev or main. Force delete anyway?"):
                 pause()
                 return
             res = git("branch", "-D", name)
