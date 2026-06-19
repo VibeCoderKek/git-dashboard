@@ -76,12 +76,14 @@ def load_registry():
             # Corrupt or unreadable — start fresh rather than crash the dashboard
             data = {"paths": [], "scanned": False}
 
+    # Merge proj's paths in-memory only — never persisted to registry.json.
+    # This keeps proj as the source of truth: deleting a workspace via
+    # `proj delete` makes it disappear here automatically, with no need
+    # for cross-tool cleanup logic.
     proj_paths = _proj_registered_paths()
     if proj_paths:
-        merged = sorted(set(data["paths"]) | set(proj_paths))
-        if merged != data["paths"]:
-            data["paths"] = merged
-            save_registry(data)
+        data = dict(data)
+        data["paths"] = sorted(set(data["paths"]) | set(proj_paths))
 
     return data
 
