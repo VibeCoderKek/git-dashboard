@@ -1498,8 +1498,12 @@ class Dashboard:
             return
         print(f"{C.PINK}🔍 Stash list:{C.RESET}")
         print(stashes.out)
-        ref = input("\nStash to inspect (e.g., stash@{{0}}), blank to cancel: ").strip()
+        ref = input("\nStash to inspect (e.g., stash@{0}), blank to cancel: ").strip()
         if not ref:
+            pause()
+            return
+        if not re.match(r"^stash@\{\d+\}$", ref):
+            print(f"{C.RED}❌ Invalid stash reference. Expected format: stash@{{N}} (e.g., stash@{{0}}).{C.RESET}")
             pause()
             return
         show = git("stash", "show", "-p", ref)

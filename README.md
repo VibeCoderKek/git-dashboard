@@ -64,13 +64,6 @@ Starting a brand-new project? You don't need an existing repo first — `cd` int
 
 ## Menu Reference
 
-### 🔐 Setup & Init
-
-| Option | Action |
-|--------|--------|
-| `30` | GitHub sign-in — set/update `origin`, store credentials so future pushes don't prompt |
-| `31` | Git init with `main` + `dev` branches, ready for GitFlow |
-
 ### 📋 Workflow
 
 | Option | Action |
@@ -79,6 +72,8 @@ Starting a brand-new project? You don't need an existing repo first — `cd` int
 | `2` | Full diff against HEAD (colorized) |
 | `2s` | Compact diff --stat summary |
 | `3` | Commit to feature branch (conventional commits enforced) |
+| `3a` | Amend the most recent commit |
+| `20` | Quick WIP snapshot commit |
 | `4` | Merge feature → dev (`--no-ff`) |
 | `5` | Milestone merge: dev → main + optional release tag |
 
@@ -90,16 +85,38 @@ Starting a brand-new project? You don't need an existing repo first — `cd` int
 | `7` | Switch branch |
 | `8` | Cleanup merged branches |
 | `9` | Delete branch (manual, with merge-status warning) |
-| `27` | Switch project — jump to another registered repo without leaving the dashboard |
 | `28` | Branch age / staleness report (flags >30 day branches) |
+| `27` | Switch project — jump to another registered repo without leaving the dashboard |
 
-### ✏️ Editing & Recovery
+### 🔬 Inspect
 
 | Option | Action |
 |--------|--------|
-| `10` | Edit a tracked file in nvim/nano |
+| `34` | Show full diff/details for a specific commit |
+| `35` | Blame a tracked file |
+| `37` | File history (`log --follow`) for a single file |
+| `26` | Search commits by keyword (`log --grep`) |
+| `16` | View commit graph (all branches) |
+| `15` | Generate `CHANGELOG.md` from conventional commits |
+
+### 🏷️ Tags & Remote
+
+| Option | Action |
+|--------|--------|
+| `32` | Tag management — list, create, push, or delete tags |
+| `17` | Push to remote (runs py_compile lint first) |
+| `18` | Pull from remote |
+| `19` | Fetch + prune remote-tracking branches |
+| `36` | Remote management — add, update, or remove remotes |
+
+### 📦 Stash & Recovery
+
+| Option | Action |
+|--------|--------|
 | `11` | Stash changes |
+| `38` | Stash list / inspect contents / drop by reference |
 | `12` | Pop stash |
+| `33` | Restore a file — discard local changes |
 | `13` | Resolve merge conflicts (opens each conflicted file) |
 | `25` | Quick-add pattern to `.gitignore` |
 
@@ -108,16 +125,17 @@ Starting a brand-new project? You don't need an existing repo first — `cd` int
 | Option | Action |
 |--------|--------|
 | `14` | Squash commits via soft reset |
-| `15` | Generate `CHANGELOG.md` from conventional commits |
-| `16` | View commit graph (all branches) |
-| `17` | Push to remote (runs py_compile lint first) |
-| `18` | Pull from remote |
-| `19` | Fetch + prune remote-tracking branches |
-| `20` | Quick WIP snapshot commit |
 | `22` | Interactive rebase onto dev |
 | `23` | Cherry-pick a commit from another branch |
 | `24` | Add a git worktree |
-| `26` | Search commits by keyword (`log --grep`) |
+| `10` | Edit a tracked file in nvim/nano |
+
+### 🔐 Setup
+
+| Option | Action |
+|--------|--------|
+| `30` | GitHub sign-in — set/update `origin`, store credentials so future pushes don't prompt |
+| `31` | Git init with `main` + `dev` branches, ready for GitFlow |
 | `29` | Fix detached HEAD — create branch from current position |
 
 ---
@@ -167,7 +185,6 @@ Option 29  →  shows current SHA, offers to create a branch from it
 ```
 
 ### Jumping between projects
-<<<<<<< Updated upstream
 
 If you work across several repos from one phone (e.g. Vector, AuraSpace, git-dashboard itself), Option 27 opens a project picker backed by a registry of known repos. Selecting one `cd`s the dashboard's working directory into that project and reloads its branch/status/config context — no need to exit and re-run `git-dash` from a different folder.
 
@@ -176,10 +193,6 @@ If you work across several repos from one phone (e.g. Vector, AuraSpace, git-das
 ```
 Option 30  →  enter GitHub username, repo name, and a Personal Access Token
 ```
-=======
-
-If you work across several repos from one phone (e.g. Vector, AuraSpace, git-dashboard itself), Option 27 opens a project picker backed by a registry of known repos. Selecting one `cd`s the dashboard's working directory into that project and reloads its branch/status/config context — no need to exit and re-run `git-dash` from a different folder.
->>>>>>> Stashed changes
 
 The token is entered with hidden input (never echoed or logged). The dashboard:
 
@@ -223,11 +236,7 @@ cd ~/Vector          # or ~/AuraSpace, ~/proj, etc.
 git-dash             # dashboard opens in context of that repo
 ```
 
-<<<<<<< Updated upstream
 The dashboard reads `.git/dashboard_config.json` inside whichever repo you're in — so last-used commit scope and GitHub username/repo are per-project. Once you're in, Option 27 lets you hop to any other registered project without quitting and re-`cd`ing manually.
-=======
-The dashboard reads `.git/dashboard_config.json` inside whichever repo you're in — so last-used commit scope is per-project. Once you're in, Option 27 lets you hop to any other registered project without quitting and re-`cd`ing manually.
->>>>>>> Stashed changes
 
 ### Worktrees (multi-project parallel work)
 
@@ -248,13 +257,8 @@ The dashboard stores per-repo config in `.git/dashboard_config.json` (excluded f
 | Key | Description |
 |-----|-------------|
 | `last_scope` | Last commit scope used (pre-fills the scope prompt) |
-<<<<<<< Updated upstream
 | `github_username` | Set by option 30 — pre-fills the username prompt next time |
 | `github_repo` | Set by option 30 — pre-fills the repo name prompt next time |
-=======
->>>>>>> Stashed changes
-
-Project registry data for Option 27 (known repo paths) is managed separately by `registry.py` rather than the per-repo dashboard config.
 
 Project registry data for Option 27 (known repo paths) is managed separately by `registry.py` rather than the per-repo dashboard config.
 
@@ -263,8 +267,6 @@ Project registry data for Option 27 (known repo paths) is managed separately by 
 ## Vision / Roadmap
 
 ### Near-term
-- **Stash list viewer** — browse named stashes, preview diffs, pop or drop by number
-- **Tag manager** — list, create, and delete tags with annotation support
 - **Conflict diff viewer** — show `ours` vs `theirs` side-by-side before opening editor
 
 ### Medium-term
@@ -272,7 +274,6 @@ Project registry data for Option 27 (known repo paths) is managed separately by 
 - **JS/TS lint integration** — run `eslint` or `tsc --noEmit` as pre-push check for React Native / Expo projects alongside `py_compile`
 - **Commit template library** — save and recall frequently used commit message patterns
 - **Remote branch manager** — list remote branches, fetch individual ones, set upstream tracking
-- **GitHub setup helper** — guided remote + credential setup directly from the dashboard
 
 ### Long-term
 - **GitHub CLI integration** — create PRs, view open issues, and merge PRs directly from the dashboard without leaving Termux
