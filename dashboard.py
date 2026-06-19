@@ -11,6 +11,7 @@ import re
 import shutil
 import shlex
 import json
+import getpass
 import py_compile
 import tempfile
 from collections import defaultdict
@@ -406,6 +407,10 @@ class Dashboard:
 
     def print_menu(self):
         print(f"{C.GRAY}┌{DASHES}┐{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET} {C.PINK}🔐 SETUP & INIT{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}30.{C.RESET} 🔑 GitHub sign-in (save credentials)")
+        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}31.{C.RESET} 🆕 Git init (main + dev)")
+        print(f"{C.GRAY}│{C.RESET}")
         print(f"{C.GRAY}│{C.RESET} {C.GOLD}📋 WORKFLOW{C.RESET}")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 1.{C.RESET} 👀 Status")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 2.{C.RESET} 🔍 Verify changes (git diff HEAD)")
@@ -1150,6 +1155,114 @@ class Dashboard:
         self._offer_detached_head_branch()
         pause()
 
+    def action_setup_github(self):
+        """30 — GitHub sign-in: configure origin + persist credentials so pushes don't prompt."""
+        if not self.require_repo():
+            return
+
+        print(f"\n{C.YELLOW}🔑 GitHub sign-in{C.RESET}")
+        default_user = self.config.get("github_username", "")
+        user_prompt = f"GitHub username [{default_user}]: " if default_user else "GitHub username: "
+        username = input(user_prompt).strip() or default_user
+
+        default_repo = self.config.get("github_repo", "")
+        repo_prompt = f"Repository name [{default_repo}]: " if default_repo else "Repository name (e.g., git-dashboard): "
+        repo_name = input(repo_prompt).strip() or default_repo
+
+        if not username or not repo_name:
+            print(f"{C.RED}❌ Username and repo name are required. Aborting.{C.RESET}")
+            pause()
+            return
+
+        pat = getpass.getpass("Personal Access Token (input hidden): ").strip()
+        if not pat:
+            print(f"{C.RED}❌ No token entered. Aborting.{C.RESET}")
+            pause()
+            return
+
+        remote_url = f"https://github.com/{username}/{repo_name}.git"
+
+        existing_origin = git("remote", "get-url", "origin")
+        if existing_origin.ok and existing_origin.out:
+            if not confirm(f"Origin already set to '{existing_origin.out}'. Overwrite with '{remote_url}'?"):
+                print(f"{C.GRAY_DIM}Keeping existing origin.{C.RESET}")
+            else:
+                res = git("remote", "set-url", "origin", remote_url)
+                print(res.out or res.err)
+        else:
+            res = git("remote", "add", "origin", remote_url)
+            print(res.out or res.err)
+
+        # Persist credential storage so pushes/pulls don't re-prompt.
+        git("config", "--global", "credential.helper", "store")
+        cred_line = f"https://{username}:{pat}@github.com\n"
+        cred_path = os.path.expanduser("~/.git-credentials")
+        try:
+            existing_lines = []
+            if os.path.isfile(cred_path):
+                with open(cred_path) as f:
+                    existing_lines = [l for l in f.readlines() if username not in l or "github.com" not in l]
+            with open(cred_path, "w") as f:
+                f.writelines(existing_lines)
+                f.write(cred_line)
+            os.chmod(cred_path, 0o600)
+        except OSError as e:
+            print(f"{C.RED}❌ Failed to store credentials: {e}{C.RESET}")
+            pause()
+            return
+
+        self.config.set("github_username", username)
+        self.config.set("github_repo", repo_name)
+        toast(f"Signed in as {username} for {repo_name}", icon="🔑")
+        print(f"{C.GRAY_DIM}   Origin set to {remote_url} — pushes via Option 17 won't prompt for credentials.{C.RESET}")
+        pause()
+
+    def action_git_init(self):
+        """31 — git init with main + dev branches, ready for GitFlow."""
+        check = run(["git", "rev-parse", "--is-inside-work-tree"])
+        if check.ok and check.out == "true":
+            print(f"{C.RED}❌ Already inside a git repository — refusing to re-init.{C.RESET}")
+            pause()
+            return
+
+        cwd = os.getcwd()
+        print(f"\n{C.YELLOW}🆕 Initialize a new repo in:{C.RESET} {C.BLUE}{cwd}{C.RESET}")
+        if not confirm("Proceed with git init (main + dev)?"):
+            pause()
+            return
+
+        res = git("init", "-b", "main")
+        print(res.out or res.err)
+        if not res.ok:
+            print(f"{C.RED}❌ git init failed.{C.RESET}")
+            pause()
+            return
+
+        # Ensure there's at least one commit on main before branching dev off it.
+        has_commit = run(["git", "rev-parse", "HEAD"])
+        if not has_commit.ok:
+            if not os.path.exists("README.md"):
+                with open("README.md", "w") as f:
+                    f.write(f"# {os.path.basename(cwd)}\n")
+                git("add", "README.md")
+                commit_res = git("commit", "-m", "chore: initial commit")
+            else:
+                git("add", ".")
+                commit_res = git("commit", "-m", "chore: initial commit")
+                if not commit_res.ok:
+                    commit_res = git("commit", "--allow-empty", "-m", "chore: initial commit")
+            print(commit_res.out or commit_res.err)
+
+        dev_res = git("checkout", "-b", "dev")
+        print(dev_res.out or dev_res.err)
+
+        if dev_res.ok:
+            toast("Repo initialized with main + dev", icon="🆕")
+            print(f"{C.GRAY_DIM}   You're now on 'dev'. Use Option 6 to start a feature branch,{C.RESET}")
+            print(f"{C.GRAY_DIM}   or Option 30 to connect a GitHub remote.{C.RESET}")
+            self.refresh()
+        pause()
+
     def _check_empty_branch_on_exit(self):
         """On exit, if current branch has zero commits ahead of dev, offer to delete it."""
         if not self.in_repo:
@@ -1200,6 +1313,8 @@ class Dashboard:
             "27": self.action_switch_project,
             "28": self.action_branch_age_report,
             "29": self.action_fix_detached_head,
+            "30": self.action_setup_github,
+            "31": self.action_git_init,
         }
 
         while True:
