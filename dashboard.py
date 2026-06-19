@@ -1262,6 +1262,36 @@ class Dashboard:
             pause()
             return
 
+        if not os.path.exists(".gitignore"):
+            default_gitignore = (
+                "# Python\n"
+                "__pycache__/\n"
+                "*.pyc\n"
+                ".venv/\n"
+                "venv/\n"
+                "\n"
+                "# Node / Expo / React Native\n"
+                "node_modules/\n"
+                ".expo/\n"
+                ".expo-shared/\n"
+                "dist/\n"
+                "build/\n"
+                "*.log\n"
+                "npm-debug.log*\n"
+                "\n"
+                "# OS / editor\n"
+                ".DS_Store\n"
+                ".vscode/\n"
+                "*.swp\n"
+                "\n"
+                "# Env\n"
+                ".env\n"
+                ".env.local\n"
+            )
+            with open(".gitignore", "w") as f:
+                f.write(default_gitignore)
+            print(f"{C.GRAY_DIM}📄 Created default .gitignore (Python/Node/Expo/editor patterns).{C.RESET}")
+
         # Ensure there's at least one commit on main before branching dev off it.
         has_commit = run(["git", "rev-parse", "HEAD"])
         if not has_commit.ok:
