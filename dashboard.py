@@ -193,15 +193,16 @@ def colorize_diff(diff_text):
 
 def _path_matches_scope(filepath, scope):
     """
-    Return True if filepath contains scope as a substring.
+    Return True if filepath contains scope as a substring (case-insensitive).
     Tries full path first; if the full path has no directory component,
     falls back to matching against just the dirname.
-    Case-sensitive throughout.
     """
-    if scope in filepath:
+    filepath_lower = filepath.lower()
+    scope_lower = scope.lower()
+    if scope_lower in filepath_lower:
         return True
-    dirname = os.path.dirname(filepath)
-    if dirname and scope in dirname:
+    dirname = os.path.dirname(filepath_lower)
+    if dirname and scope_lower in dirname:
         return True
     return False
 
