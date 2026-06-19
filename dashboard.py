@@ -1292,6 +1292,225 @@ class Dashboard:
             else:
                 print(f"{C.RED}❌ Failed: {res.err}{C.RESET}")
 
+
+    def action_amend_commit(self):
+        """3a — Amend the most recent commit."""
+        if not self.require_repo():
+            return
+        if self.branch in ("main", "dev"):
+            print(f"{C.RED}❌ Error: GitFlow violation. Cannot amend on {self.branch}.{C.RESET}")
+            pause()
+            return
+        last_log = git("log", "-1", "--pretty=format:%h %s")
+        if not last_log.ok or not last_log.out:
+            print(f"{C.RED}❌ No commits found to amend.{C.RESET}")
+            pause()
+            return
+        print(f"{C.YELLOW}✏️  Last commit:{C.RESET} {last_log.out}")
+        diff = git("diff", "HEAD")
+        untracked = git("ls-files", "--others", "--exclude-standard")
+        if diff.out:
+            print(colorize_diff(diff.out))
+        if untracked.out:
+            print(f"{C.YELLOW}📄 Untracked files:{C.RESET}")
+            print(untracked.out)
+        if diff.out or untracked.out:
+            if confirm("Stage current changes into this commit?"):
+                git("add", ".")
+        new_msg = input("New commit message (blank = keep existing): ").strip()
+        if new_msg:
+            res = git("commit", "--amend", "-m", new_msg)
+        else:
+            res = git("commit", "--amend", "--no-edit")
+        print(res.out or res.err)
+        if res.ok:
+            toast("Commit amended.", icon="✏️")
+        pause()
+
+    def action_tag_management(self):
+        """32 — List, create, push, or delete tags."""
+        if not self.require_repo():
+            return
+        print(f"{C.GOLD}🏷️  Tag management{C.RESET}")
+        print("  1. List tags")
+        print("  2. Create tag")
+        print("  3. Push tag(s)")
+        print("  4. Delete tag")
+        choice = input("Choice: ").strip()
+
+        if choice == "1":
+            tags = git("tag", "-n")
+            print(tags.out or f"{C.GRAY_DIM}No tags found.{C.RESET}")
+
+        elif choice == "2":
+            name = input("Tag name (e.g., v1.2.0): ").strip()
+            if not name or not run(["git", "check-ref-format", "refs/tags/" + name]).ok:
+                print(f"{C.RED}❌ Invalid tag name.{C.RESET}")
+                pause()
+                return
+            msg = input("Tag message (blank = lightweight tag): ").strip()
+            res = git("tag", "-a", name, "-m", msg) if msg else git("tag", name)
+            print(res.out or res.err)
+            if res.ok:
+                toast(f"Tagged {name}", icon="🏷️")
+
+        elif choice == "3":
+            tags = git("tag")
+            if not tags.out:
+                print(f"{C.GRAY_DIM}No tags to push.{C.RESET}")
+            else:
+                print(tags.out)
+                name = input("Tag to push (blank = push all): ").strip()
+                res = git("push", "origin", name) if name else git("push", "origin", "--tags")
+                print(res.out or res.err)
+                if res.ok:
+                    toast("Tag(s) pushed.", icon="⬆️")
+
+        elif choice == "4":
+            tags = git("tag")
+            if not tags.out:
+                print(f"{C.GRAY_DIM}No tags found.{C.RESET}")
+                pause()
+                return
+            print(tags.out)
+            name = input("Tag to delete: ").strip()
+            if name and confirm(f"Delete tag '{name}' locally?"):
+                res = git("tag", "-d", name)
+                print(res.out or res.err)
+                if confirm("Also delete from remote?"):
+                    res2 = git("push", "origin", f":refs/tags/{name}")
+                    print(res2.out or res2.err)
+        else:
+            print(f"{C.RED}❌ Invalid choice.{C.RESET}")
+        pause()
+
+    def action_restore_file(self):
+        """33 — Discard local changes to a single file."""
+        if not self.require_repo():
+            return
+        status = git("status", "-s")
+        if not status.out:
+            print(f"{C.GREEN}✅ Working tree clean — nothing to restore.{C.RESET}")
+            pause()
+            return
+        print(f"{C.YELLOW}🧹 Changed files:{C.RESET}")
+        print(status.out)
+        fname = input("\nFile to restore (discard changes), blank to cancel: ").strip()
+        if not fname:
+            pause()
+            return
+        if not confirm(f"⚠️  Discard ALL changes to '{fname}'? This cannot be undone."):
+            pause()
+            return
+        res = git("checkout", "--", fname)
+        print(res.out or res.err)
+        if res.ok:
+            toast(f"Restored {fname}", icon="🧹")
+        pause()
+
+    def action_show_commit(self):
+        """34 — Show full diff/details for a commit."""
+        if not self.require_repo():
+            return
+        log = git("log", "--oneline", "-10")
+        print(f"{C.YELLOW}Recent commits:{C.RESET}")
+        print(log.out)
+        sha = input("\nCommit SHA to show (blank = HEAD): ").strip() or "HEAD"
+        res = git("show", sha)
+        print(colorize_diff(res.out) if res.ok else res.err)
+        offer_clipboard(res.out, "commit details")
+        pause()
+
+    def action_blame_file(self):
+        """35 — git blame on a tracked file."""
+        if not self.require_repo():
+            return
+        tracked = git("ls-files")
+        print(f"{C.YELLOW}📄 Tracked files:{C.RESET}")
+        print(tracked.out)
+        fname = input("\nFile to blame: ").strip()
+        if not fname:
+            pause()
+            return
+        res = git("blame", fname)
+        print(res.out or res.err)
+        pause()
+
+    def action_remote_management(self):
+        """36 — Add, update, or remove remotes."""
+        if not self.require_repo():
+            return
+        print(f"{C.CYAN}🌐 Remote management{C.RESET}")
+        remotes = git("remote", "-v")
+        print(remotes.out or f"{C.GRAY_DIM}No remotes configured.{C.RESET}")
+        print("\n  1. Add remote")
+        print("  2. Change remote URL")
+        print("  3. Remove remote")
+        choice = input("Choice (blank to cancel): ").strip()
+
+        if choice == "1":
+            name = input("Remote name (e.g., origin): ").strip()
+            url = input("Remote URL: ").strip()
+            if name and url:
+                res = git("remote", "add", name, url)
+                print(res.out or res.err)
+                if res.ok:
+                    toast(f"Added remote {name}", icon="🌐")
+        elif choice == "2":
+            name = input("Remote name to update: ").strip()
+            url = input("New URL: ").strip()
+            if name and url:
+                res = git("remote", "set-url", name, url)
+                print(res.out or res.err)
+                if res.ok:
+                    toast(f"Updated {name}", icon="🌐")
+        elif choice == "3":
+            name = input("Remote name to remove: ").strip()
+            if name and confirm(f"Remove remote '{name}'?"):
+                res = git("remote", "remove", name)
+                print(res.out or res.err)
+        pause()
+
+    def action_file_history(self):
+        """37 — log --follow for a single file."""
+        if not self.require_repo():
+            return
+        tracked = git("ls-files")
+        print(f"{C.YELLOW}📄 Tracked files:{C.RESET}")
+        print(tracked.out)
+        fname = input("\nFile to view history for: ").strip()
+        if not fname:
+            pause()
+            return
+        res = git("log", "--oneline", "--follow", "--", fname)
+        print(res.out or f"{C.GRAY_DIM}No history found.{C.RESET}")
+        offer_clipboard(res.out, "file history")
+        pause()
+
+    def action_stash_inspect(self):
+        """38 — List stashes, inspect contents, optionally drop."""
+        if not self.require_repo():
+            return
+        stashes = git("stash", "list")
+        if not stashes.out:
+            print(f"{C.GREEN}✅ No stashes found.{C.RESET}")
+            pause()
+            return
+        print(f"{C.PINK}🔍 Stash list:{C.RESET}")
+        print(stashes.out)
+        ref = input("\nStash to inspect (e.g., stash@{{0}}), blank to cancel: ").strip()
+        if not ref:
+            pause()
+            return
+        show = git("stash", "show", "-p", ref)
+        print(colorize_diff(show.out) if show.ok else show.err)
+        if confirm(f"\nDrop {ref}?"):
+            res = git("stash", "drop", ref)
+            print(res.out or res.err)
+            if res.ok:
+                toast(f"Dropped {ref}", icon="🗑️")
+        pause()
+
     # ── Main loop ─────────────────────────────────────────────────────────────
 
     def run_loop(self):
@@ -1327,6 +1546,14 @@ class Dashboard:
             "29": self.action_fix_detached_head,
             "30": self.action_setup_github,
             "31": self.action_git_init,
+            "3a": self.action_amend_commit,
+            "32": self.action_tag_management,
+            "33": self.action_restore_file,
+            "34": self.action_show_commit,
+            "35": self.action_blame_file,
+            "36": self.action_remote_management,
+            "37": self.action_file_history,
+            "38": self.action_stash_inspect,
         }
 
         while True:
