@@ -16,6 +16,8 @@ import tempfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
+import registry
+
 
 class C:
     RESET = "\033[0m"
@@ -417,6 +419,7 @@ class Dashboard:
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 7.{C.RESET} 🔁 Switch branch")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 8.{C.RESET} 🧹 Cleanup merged branches")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 9.{C.RESET} 🗑️  Delete branch (manual)")
+        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}27.{C.RESET} 🔮 Switch project")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE}28.{C.RESET} 📅 Branch age / staleness report")
         print(f"{C.GRAY}│{C.RESET}")
         print(f"{C.GRAY}│{C.RESET} {C.GOLD}✏️  EDITING & RECOVERY{C.RESET}")
@@ -1066,6 +1069,22 @@ class Dashboard:
         offer_clipboard(log.out, "search results")
         pause()
 
+    def action_switch_project(self):
+        """27 — multi-repo switcher. Lets you jump to another registered project."""
+        target = registry.run_repo_switcher()
+        if not target:
+            return
+        try:
+            os.chdir(target)
+        except OSError as e:
+            print(f"{C.RED}❌ Failed to switch to {target}: {e}{C.RESET}")
+            pause()
+            return
+        toast(f"Switched to {os.path.basename(target)}", icon="🔮")
+        self.config = DashboardConfig()
+        self.refresh()
+        pause()
+
     def action_branch_age_report(self):
         """28 — list branches sorted by last-commit date, flag stale ones."""
         if not self.require_repo():
@@ -1178,6 +1197,7 @@ class Dashboard:
             "24": self.action_worktree_add,
             "25": self.action_gitignore_add,
             "26": self.action_commit_search,
+            "27": self.action_switch_project,
             "28": self.action_branch_age_report,
             "29": self.action_fix_detached_head,
         }
