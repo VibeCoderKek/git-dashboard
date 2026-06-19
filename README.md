@@ -18,6 +18,8 @@ main        ← stable releases only, tagged milestones
 
 Every guardrail, every warning, and every default in the dashboard is designed around this model. You cannot accidentally commit to `main` or `dev`. You cannot push without a lint check. You cannot abandon a branch silently.
 
+The dashboard also spans **multiple projects** (Option 27) and can now **bootstrap a brand-new repo from zero** (Option 31) and **sign in to GitHub with saved credentials** (Option 30) — so the whole lifecycle, from empty folder to pushed milestone, stays inside one tool.
+
 ---
 
 ## Requirements
@@ -56,9 +58,18 @@ cd ~/your-project
 git-dash
 ```
 
+Starting a brand-new project? You don't need an existing repo first — `cd` into the (possibly empty) folder and run `git-dash`. It'll detect there's no repo yet and Option 31 will set one up for you.
+
 ---
 
 ## Menu Reference
+
+### 🔐 Setup & Init
+
+| Option | Action |
+|--------|--------|
+| `30` | GitHub sign-in — set/update `origin`, store credentials so future pushes don't prompt |
+| `31` | Git init with `main` + `dev` branches, ready for GitFlow |
 
 ### 📋 Workflow
 
@@ -79,6 +90,7 @@ git-dash
 | `7` | Switch branch |
 | `8` | Cleanup merged branches |
 | `9` | Delete branch (manual, with merge-status warning) |
+| `27` | Switch project — jump to another registered repo without leaving the dashboard |
 | `28` | Branch age / staleness report (flags >30 day branches) |
 
 ### ✏️ Editing & Recovery
@@ -107,11 +119,18 @@ git-dash
 | `24` | Add a git worktree |
 | `26` | Search commits by keyword (`log --grep`) |
 | `29` | Fix detached HEAD — create branch from current position |
-| `30` | Setup GitHub remote + store PAT credentials |
 
 ---
 
 ## How to Use It
+
+### Bootstrapping a brand-new project
+
+```
+Option 31 →  git init -b main, ensures an initial commit, branches dev off it
+Option 30 →  sign in to GitHub, connect origin, save credentials
+Option 6  →  create your first feature branch off dev
+```
 
 ### Starting a new feature
 
@@ -147,11 +166,26 @@ Option 17 →  push main + tags
 Option 29  →  shows current SHA, offers to create a branch from it
 ```
 
-### First-time GitHub setup
+### Jumping between projects
+
+If you work across several repos from one phone (e.g. Vector, AuraSpace, git-dashboard itself), Option 27 opens a project picker backed by a registry of known repos. Selecting one `cd`s the dashboard's working directory into that project and reloads its branch/status/config context — no need to exit and re-run `git-dash` from a different folder.
+
+### GitHub sign-in
 
 ```
-Option 30  →  enter username, repo name, PAT — credentials stored in ~/.git-credentials
+Option 30  →  enter GitHub username, repo name, and a Personal Access Token
 ```
+
+The token is entered with hidden input (never echoed or logged). The dashboard:
+
+- Sets or updates `origin` to `https://github.com/<username>/<repo>.git`
+- Sets `credential.helper store` globally
+- Writes the credential line into `~/.git-credentials` (mode `600`), replacing any stale entry for that username on github.com
+- Remembers your username and repo name per-project so the prompts pre-fill next time
+
+After this, Option 17 (push) and Option 18 (pull) won't prompt for credentials again.
+
+> Use a fine-scoped Personal Access Token (repo access only), not your account password — GitHub requires PATs for HTTPS git operations anyway.
 
 ---
 
@@ -164,6 +198,7 @@ Option 30  →  enter username, repo name, PAT — credentials stored in ~/.git-
 - **Stash safety** — options 6 and 7 detect a dirty tree and offer to stash inline instead of hard-aborting
 - **Pre-push lint** — option 17 runs `py_compile` over all tracked `.py` files before pushing, with a "push anyway?" escape hatch
 - **Protected branches** — `main` and `dev` cannot be deleted via option 9
+- **No double-init** — option 31 refuses to run if you're already inside a git repository
 
 ---
 
@@ -183,7 +218,7 @@ cd ~/Vector          # or ~/AuraSpace, ~/proj, etc.
 git-dash             # dashboard opens in context of that repo
 ```
 
-The dashboard reads `.git/dashboard_config.json` inside whichever repo you're in — so last-used commit scope and GitHub config are per-project.
+The dashboard reads `.git/dashboard_config.json` inside whichever repo you're in — so last-used commit scope and GitHub username/repo are per-project. Once you're in, Option 27 lets you hop to any other registered project without quitting and re-`cd`ing manually.
 
 ### Worktrees (multi-project parallel work)
 
@@ -204,8 +239,8 @@ The dashboard stores per-repo config in `.git/dashboard_config.json` (excluded f
 | Key | Description |
 |-----|-------------|
 | `last_scope` | Last commit scope used (pre-fills the scope prompt) |
-| `github_username` | Set by option 30 |
-| `github_repo` | Set by option 30 |
+| `github_username` | Set by option 30 — pre-fills the username prompt next time |
+| `github_repo` | Set by option 30 — pre-fills the repo name prompt next time |
 
 Global git config set by the dashboard:
 
@@ -213,12 +248,13 @@ Global git config set by the dashboard:
 credential.helper = store   ← set by option 30, persists PAT across sessions
 ```
 
+Project registry data for Option 27 (known repo paths) is managed separately by `registry.py` rather than the per-repo dashboard config.
+
 ---
 
 ## Vision / Roadmap
 
 ### Near-term
-- **Multi-repo switcher** — select from a list of known project directories without leaving the dashboard
 - **Stash list viewer** — browse named stashes, preview diffs, pop or drop by number
 - **Tag manager** — list, create, and delete tags with annotation support
 - **Conflict diff viewer** — show `ours` vs `theirs` side-by-side before opening editor
