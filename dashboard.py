@@ -324,7 +324,7 @@ class Dashboard:
             name = input("New branch name: ").strip()
             sanitized = sanitize_branch_name(name)
             if sanitized and is_valid_branch_name(sanitized):
-                res = git("checkout", "-b", sanitized)
+                res = git("switch", "-c", sanitized)
                 print(res.out or res.err)
                 if res.ok:
                     toast(f"Created and switched to '{sanitized}'", icon="🌿")
@@ -587,7 +587,7 @@ class Dashboard:
             pause()
             return
         feature = self.branch
-        git("checkout", "dev")
+        git("switch", "dev")
         res = git("merge", "--no-ff", feature)
         print(res.out or res.err)
         if "CONFLICT" in (res.out + res.err):
@@ -610,7 +610,7 @@ class Dashboard:
     def action_milestone_merge(self):
         if not self.require_repo():
             return
-        git("checkout", "main")
+        git("switch", "main")
         res = git("merge", "--no-ff", "dev")
         print(res.out or res.err)
         if res.ok:
@@ -631,7 +631,7 @@ class Dashboard:
             if not self._offer_stash_and_continue():
                 pause()
                 return
-        git("checkout", "dev")
+        git("switch", "dev")
         name = input("🌱 Feature branch name: ").strip()
         sanitized = sanitize_branch_name(name)
         if not sanitized or not is_valid_branch_name(sanitized):
@@ -644,7 +644,7 @@ class Dashboard:
             pause()
             return
         print(f"Creating branch: {C.BLUE}{sanitized}{C.RESET}")
-        res = git("checkout", "-b", sanitized)
+        res = git("switch", "-c", sanitized)
         print(res.out or res.err)
         pause()
 
@@ -668,7 +668,7 @@ class Dashboard:
     def action_cleanup_branches(self):
         if not self.require_repo():
             return
-        git("checkout", "dev")
+        git("switch", "dev")
         merged = git("branch", "--merged")
         branches = [b.strip().lstrip("* ") for b in merged.out.split("\n") if b.strip()]
         safe = [b for b in branches if b not in ("main", "dev", "")]
@@ -1265,7 +1265,7 @@ class Dashboard:
                     commit_res = git("commit", "--allow-empty", "-m", "chore: initial commit")
             print(commit_res.out or commit_res.err)
 
-        dev_res = git("checkout", "-b", "dev")
+        dev_res = git("switch", "-c", "dev")
         print(dev_res.out or dev_res.err)
 
         if dev_res.ok:
@@ -1296,7 +1296,7 @@ class Dashboard:
             return
         print(f"\n{C.YELLOW}💤 Branch '{self.branch}' has no commits ahead of dev.{C.RESET}")
         if confirm(f"Delete abandoned branch '{self.branch}' before exiting?"):
-            git("checkout", "dev")
+            git("switch", "dev")
             res = git("branch", "-d", self.branch)
             if res.ok:
                 print(f"{C.GREEN}🗑️  Deleted '{self.branch}'.{C.RESET}")
