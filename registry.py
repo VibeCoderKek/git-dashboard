@@ -25,6 +25,25 @@ from pathlib import Path
 REGISTRY_DIR = Path.home() / ".git-dashboard"
 REGISTRY_FILE = REGISTRY_DIR / "registry.json"
 
+PROJ_WORKSPACES_DIR = Path.home() / ".proj" / "workspaces"
+
+
+def _proj_registered_paths():
+    """Pull in every path proj already knows about (~/.proj/workspaces/*.json)."""
+    paths = []
+    if not PROJ_WORKSPACES_DIR.exists():
+        return paths
+    for f in PROJ_WORKSPACES_DIR.glob("*.json"):
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            p = data.get("path")
+            if p:
+                paths.append(p)
+        except (json.JSONDecodeError, OSError):
+            continue
+    return paths
+
 # Colors (ANSI) — adjust/remove if dashboard.py already has its own palette
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -43,19 +62,28 @@ def _ensure_registry_dir():
 
 
 def load_registry():
-    """Load registry.json. Returns dict with 'paths' (list[str]) and 'scanned' (bool)."""
+    """Load registry.json, merged with proj's workspace registrations."""
     _ensure_registry_dir()
     if not REGISTRY_FILE.exists():
-        return {"paths": [], "scanned": False}
-    try:
-        with open(REGISTRY_FILE, "r") as f:
-            data = json.load(f)
-        data.setdefault("paths", [])
-        data.setdefault("scanned", False)
-        return data
-    except (json.JSONDecodeError, OSError):
-        # Corrupt or unreadable — start fresh rather than crash the dashboard
-        return {"paths": [], "scanned": False}
+        data = {"paths": [], "scanned": False}
+    else:
+        try:
+            with open(REGISTRY_FILE, "r") as f:
+                data = json.load(f)
+            data.setdefault("paths", [])
+            data.setdefault("scanned", False)
+        except (json.JSONDecodeError, OSError):
+            # Corrupt or unreadable — start fresh rather than crash the dashboard
+            data = {"paths": [], "scanned": False}
+
+    proj_paths = _proj_registered_paths()
+    if proj_paths:
+        merged = sorted(set(data["paths"]) | set(proj_paths))
+        if merged != data["paths"]:
+            data["paths"] = merged
+            save_registry(data)
+
+    return data
 
 
 def save_registry(data):
