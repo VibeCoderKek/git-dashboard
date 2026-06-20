@@ -85,6 +85,34 @@ TYPE_TITLES = {
     "other": "🔧 Other",
 }
 
+ACTION_LABELS = {
+    "1": "👀 Status", "2": "🔍 Diff (full)", "2s": "📊 Diff stat summary",
+    "3": "💾 Commit", "3a": "✏️  Amend last commit", "20": "⚡ Quick WIP commit",
+    "4": "🔀 Merge feature → dev", "5": "🏆 Milestone merge → main",
+    "6": "🌱 New feature branch", "7": "🔁 Switch branch",
+    "8": "🧹 Cleanup merged branches", "9": "🗑️  Delete branch",
+    "28": "📅 Branch staleness report", "27": "🔮 Switch project",
+    "34": "🔬 Show commit", "35": "👁️  Blame file", "37": "📄 File history",
+    "26": "🔎 Commit search", "16": "🌐 Commit graph", "15": "📜 Generate changelog",
+    "32": "🏷️  Tag management", "17": "⬆️  Push to remote", "18": "⬇️  Pull from remote",
+    "19": "🔄 Fetch + prune", "36": "🌐 Remote management",
+    "11": "📦 Stash changes", "38": "🔍 Stash list/inspect/drop", "12": "📤 Pop stash",
+    "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "25": "📄 .gitignore quick-add",
+    "14": "🪓 Squash commits", "22": "🔃 Interactive rebase", "23": "🍒 Cherry-pick",
+    "24": "🌲 Worktree add", "10": "📝 Edit file",
+    "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
+}
+
+CATEGORIES = {
+    "W": ("📋 WORKFLOW", C.GOLD, ["1", "2", "2s", "3", "3a", "20", "4", "5"]),
+    "B": ("🌿 BRANCHING", C.GREEN, ["6", "7", "8", "9", "28", "27"]),
+    "I": ("🔬 INSPECT", C.CYAN, ["34", "35", "37", "26", "16", "15"]),
+    "T": ("🏷️  TAGS & REMOTE", C.GOLD, ["32", "17", "18", "19", "36"]),
+    "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "25"]),
+    "A": ("⚙️  ADVANCED", C.PINK, ["14", "22", "23", "24", "10"]),
+    "U": ("🔐 SETUP", C.PINK, ["30", "31", "29"]),
+}
+
 BANNER_LINES = [
     "██████╗  ██╗ ███████╗",
     "██╔════╝ ██║ ╚══██╔══╝",
@@ -193,15 +221,16 @@ def colorize_diff(diff_text):
 
 def _path_matches_scope(filepath, scope):
     """
-    Return True if filepath contains scope as a substring.
+    Return True if filepath contains scope as a substring (case-insensitive).
     Tries full path first; if the full path has no directory component,
     falls back to matching against just the dirname.
-    Case-sensitive throughout.
     """
-    if scope in filepath:
+    filepath_lower = filepath.lower()
+    scope_lower = scope.lower()
+    if scope_lower in filepath_lower:
         return True
-    dirname = os.path.dirname(filepath)
-    if dirname and scope in dirname:
+    dirname = os.path.dirname(filepath_lower)
+    if dirname and scope_lower in dirname:
         return True
     return False
 
@@ -229,6 +258,19 @@ def _check_scope_mismatch(scope, threshold=0.5):
 
     mismatched = [f for f in all_files if not _path_matches_scope(f, scope)]
     return mismatched, all_files
+
+
+def _is_branch_merged(branch_name):
+    """
+    Return True if branch_name is merged into dev OR main.
+    Checks both protected branches so hotfix-style branches merged
+    only into main aren't incorrectly flagged as unmerged.
+    """
+    merged_dev = git("branch", "--merged", "dev", "--list", branch_name)
+    if merged_dev.out:
+        return True
+    merged_main = git("branch", "--merged", "main", "--list", branch_name)
+    return bool(merged_main.out)
 
 
 def _lint_python_files():
@@ -324,7 +366,7 @@ class Dashboard:
             name = input("New branch name: ").strip()
             sanitized = sanitize_branch_name(name)
             if sanitized and is_valid_branch_name(sanitized):
-                res = git("checkout", "-b", sanitized)
+                res = git("switch", "-c", sanitized)
                 print(res.out or res.err)
                 if res.ok:
                     toast(f"Created and switched to '{sanitized}'", icon="🌿")
@@ -406,49 +448,31 @@ class Dashboard:
         print()
 
     def print_menu(self):
+        usage = self.config.get("action_usage", {})
+        top = sorted(usage.items(), key=lambda kv: kv[1], reverse=True)[:4]
         print(f"{C.GRAY}┌{DASHES}┐{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.PINK}🔐 SETUP & INIT{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}30.{C.RESET} 🔑 GitHub sign-in (save credentials)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}31.{C.RESET} 🆕 Git init (main + dev)")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.GOLD}📋 WORKFLOW{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 1.{C.RESET} 👀 Status")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 2.{C.RESET} 🔍 Verify changes (git diff HEAD)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 2s.{C.RESET} 📊 Diff stat summary")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 3.{C.RESET} 💾 Commit to feature branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 4.{C.RESET} 🔀 Merge feature to dev (--no-ff)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 5.{C.RESET} 🏆 Milestone: Merge dev to main")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.GREEN}🌿 BRANCHING{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 6.{C.RESET} 🌱 Feature branch (off dev)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 7.{C.RESET} 🔁 Switch branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 8.{C.RESET} 🧹 Cleanup merged branches")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 9.{C.RESET} 🗑️  Delete branch (manual)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}27.{C.RESET} 🔮 Switch project")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}28.{C.RESET} 📅 Branch age / staleness report")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.GOLD}✏️  EDITING & RECOVERY{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}10.{C.RESET} 📝 Edit file")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}11.{C.RESET} 📦 Stash changes")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}12.{C.RESET} 📤 Pop stash")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}13.{C.RESET} 🩹 Resolve conflicts")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}25.{C.RESET} 📄 .gitignore quick-add")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.PINK}⚙️  ADVANCED{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}14.{C.RESET} 🪓 Squash commits (soft reset)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}15.{C.RESET} 📜 Generate changelog")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}16.{C.RESET} 🌐 View commit graph")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}17.{C.RESET} ⬆️  Push to remote")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}18.{C.RESET} ⬇️  Pull from remote")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}19.{C.RESET} 🔄 Fetch + prune remote-tracking")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}20.{C.RESET} ⚡ Quick WIP commit")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}22.{C.RESET} 🔃 Interactive rebase (onto dev)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}23.{C.RESET} 🍒 Cherry-pick from branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}24.{C.RESET} 🌲 Worktree add")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}26.{C.RESET} 🔎 Commit search (log --grep)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}29.{C.RESET} 🏥 Fix detached HEAD → create branch")
+        if top:
+            print(f"{C.GRAY}│{C.RESET} {C.GOLD}⭐ FAVORITES{C.RESET}")
+            for choice, _ in top:
+                label = ACTION_LABELS.get(choice, choice)
+                print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{choice:>3}.{C.RESET} {label}")
+            print(f"{C.GRAY}│{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET} {C.GOLD}CATEGORIES{C.RESET}")
+        for key, (title, color, _) in CATEGORIES.items():
+            print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{key}.{C.RESET}  {color}{title}{C.RESET}")
         print(f"{C.GRAY}│{C.RESET}")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE}21.{C.RESET} {C.RED}🚪 Exit{C.RESET}")
+        print(f"{C.GRAY}└{DASHES}┘{C.RESET}")
+
+    def print_submenu(self, key):
+        title, color, numbers = CATEGORIES[key]
+        print(f"{C.GRAY}┌{DASHES}┐{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET} {color}{title}{C.RESET}")
+        for num in numbers:
+            label = ACTION_LABELS.get(num, num)
+            print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{num:>3}.{C.RESET} {label}")
+        print(f"{C.GRAY}│{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}b.{C.RESET}  {C.GRAY_DIM}← Back{C.RESET}")
         print(f"{C.GRAY}└{DASHES}┘{C.RESET}")
 
     # ── Existing actions (unchanged) ──────────────────────────────────────────
@@ -575,7 +599,7 @@ class Dashboard:
             pause()
             return
         feature = self.branch
-        git("checkout", "dev")
+        git("switch", "dev")
         res = git("merge", "--no-ff", feature)
         print(res.out or res.err)
         if "CONFLICT" in (res.out + res.err):
@@ -598,7 +622,7 @@ class Dashboard:
     def action_milestone_merge(self):
         if not self.require_repo():
             return
-        git("checkout", "main")
+        git("switch", "main")
         res = git("merge", "--no-ff", "dev")
         print(res.out or res.err)
         if res.ok:
@@ -619,7 +643,7 @@ class Dashboard:
             if not self._offer_stash_and_continue():
                 pause()
                 return
-        git("checkout", "dev")
+        git("switch", "dev")
         name = input("🌱 Feature branch name: ").strip()
         sanitized = sanitize_branch_name(name)
         if not sanitized or not is_valid_branch_name(sanitized):
@@ -632,7 +656,7 @@ class Dashboard:
             pause()
             return
         print(f"Creating branch: {C.BLUE}{sanitized}{C.RESET}")
-        res = git("checkout", "-b", sanitized)
+        res = git("switch", "-c", sanitized)
         print(res.out or res.err)
         pause()
 
@@ -656,7 +680,7 @@ class Dashboard:
     def action_cleanup_branches(self):
         if not self.require_repo():
             return
-        git("checkout", "dev")
+        git("switch", "dev")
         merged = git("branch", "--merged")
         branches = [b.strip().lstrip("* ") for b in merged.out.split("\n") if b.strip()]
         safe = [b for b in branches if b not in ("main", "dev", "")]
@@ -690,8 +714,7 @@ class Dashboard:
 
         print(f"{C.YELLOW}🌿 Branches:{C.RESET}")
         for b in deletable:
-            merged = git("branch", "--merged", "dev", "--list", b)
-            tag = f"{C.GREEN}(merged to dev){C.RESET}" if merged.out else f"{C.ORANGE}(unmerged){C.RESET}"
+            tag = f"{C.GREEN}(merged){C.RESET}" if _is_branch_merged(b) else f"{C.ORANGE}(unmerged){C.RESET}"
             print(f" - {b} {tag}")
 
         name = input("\nBranch to delete (blank to cancel): ").strip()
@@ -707,9 +730,8 @@ class Dashboard:
             pause()
             return
 
-        merged = git("branch", "--merged", "dev", "--list", name)
-        if not merged.out:
-            if not confirm(f"⚠️  '{name}' is NOT merged into dev. Force delete anyway?"):
+        if not _is_branch_merged(name):
+            if not confirm(f"⚠️  '{name}' is NOT merged into dev or main. Force delete anyway?"):
                 pause()
                 return
             res = git("branch", "-D", name)
@@ -781,6 +803,7 @@ class Dashboard:
         print(f"{C.YELLOW}📦 All files edited. Staging changes...{C.RESET}")
         git("add", ".")
         print(f"{C.GREEN}✅ Changes staged! Use Option 3 to finalize the merge commit.{C.RESET}")
+        toast("Conflicts staged.", icon="🩹")
         pause()
 
     def action_squash(self):
@@ -897,6 +920,7 @@ class Dashboard:
             print(f"{C.GREEN}✅ Successfully pulled {self.branch}.{C.RESET}")
             if res.out:
                 print(res.out)
+            toast("Pull complete.", icon="⬇️")
         pause()
 
     def action_fetch_prune(self):
@@ -954,6 +978,59 @@ class Dashboard:
         subprocess.call(["git", "rebase", "-i", "dev"], env=env)
         pause()
 
+    def _paginated_commit_picker(self, ref=None, page_size=10):
+        """
+        Page through commits (optionally on a given ref/branch) and let the
+        user pick one by number, type 'm' for more, or type a raw SHA/partial
+        SHA directly even if it's outside the currently shown page.
+        Returns the chosen SHA string, or None if cancelled.
+        """
+        skip = 0
+        shown = []
+        while True:
+            args = ["log", "--oneline", f"--skip={skip}", f"-{page_size}"]
+            if ref:
+                args.append(ref)
+            page = git(*args)
+            if not page.out:
+                if not shown:
+                    print(f"{C.RED}❌ No commits found.{C.RESET}")
+                    return None
+                print(f"{C.GRAY_DIM}(no more commits){C.RESET}")
+            else:
+                new_lines = page.out.split("\n")
+                shown.extend(new_lines)
+                start_idx = len(shown) - len(new_lines) + 1
+                for i, c in enumerate(new_lines, start_idx):
+                    sha = c.split(" ", 1)[0]
+                    msg = c.split(" ", 1)[1] if " " in c else ""
+                    print(f"  {C.BLUE}{i}.{C.RESET} {C.GOLD}{sha}{C.RESET} {msg}")
+
+            choice = input(
+                f"\nNumber to select, {C.GRAY_DIM}'m'{C.RESET} for more, "
+                f"or paste a SHA directly (blank to cancel): "
+            ).strip()
+
+            if not choice:
+                return None
+            if choice.lower() == "m":
+                skip += page_size
+                continue
+            try:
+                idx = int(choice)
+                if 1 <= idx <= len(shown):
+                    return shown[idx - 1].split(" ", 1)[0]
+                print(f"{C.RED}❌ Number out of range.{C.RESET}")
+                continue
+            except ValueError:
+                pass
+
+            # Treat as a raw SHA/partial SHA — verify it resolves
+            verify = git("rev-parse", "--verify", "--quiet", choice)
+            if verify.ok:
+                return choice
+            print(f"{C.RED}❌ '{choice}' is not a valid commit reference.{C.RESET}")
+
     def action_cherry_pick(self):
         """23 — list commits from another branch, pick one by number."""
         if not self.require_repo():
@@ -977,24 +1054,10 @@ class Dashboard:
             pause()
             return
 
-        log = git("log", "--oneline", "-20", src_branch)
-        if not log.out:
-            print(f"{C.RED}❌ No commits found on {src_branch}.{C.RESET}")
-            pause()
-            return
-
-        commits = log.out.split("\n")
-        print(f"\n{C.YELLOW}Recent commits on {src_branch}:{C.RESET}")
-        for i, c in enumerate(commits, 1):
-            sha = c.split(" ", 1)[0]
-            msg = c.split(" ", 1)[1] if " " in c else ""
-            print(f"  {C.BLUE}{i}.{C.RESET} {C.GOLD}{sha}{C.RESET} {msg}")
-
-        pick = input("\nCommit number to cherry-pick: ").strip()
-        try:
-            target = commits[int(pick) - 1].split(" ", 1)[0]
-        except (ValueError, IndexError):
-            print(f"{C.RED}❌ Invalid selection.{C.RESET}")
+        print(f"\n{C.YELLOW}Commits on {src_branch}:{C.RESET}")
+        target = self._paginated_commit_picker(ref=src_branch)
+        if not target:
+            print(f"{C.GRAY_DIM}Cancelled.{C.RESET}")
             pause()
             return
 
@@ -1052,6 +1115,7 @@ class Dashboard:
         with open(gitignore_path, "a") as f:
             f.write(f"\n{pattern}\n")
         print(f"{C.GREEN}✅ Added '{pattern}' to .gitignore{C.RESET}")
+        toast(f"Added '{pattern}' to .gitignore", icon="📄")
         pause()
 
     def action_commit_search(self):
@@ -1238,6 +1302,36 @@ class Dashboard:
             pause()
             return
 
+        if not os.path.exists(".gitignore"):
+            default_gitignore = (
+                "# Python\n"
+                "__pycache__/\n"
+                "*.pyc\n"
+                ".venv/\n"
+                "venv/\n"
+                "\n"
+                "# Node / Expo / React Native\n"
+                "node_modules/\n"
+                ".expo/\n"
+                ".expo-shared/\n"
+                "dist/\n"
+                "build/\n"
+                "*.log\n"
+                "npm-debug.log*\n"
+                "\n"
+                "# OS / editor\n"
+                ".DS_Store\n"
+                ".vscode/\n"
+                "*.swp\n"
+                "\n"
+                "# Env\n"
+                ".env\n"
+                ".env.local\n"
+            )
+            with open(".gitignore", "w") as f:
+                f.write(default_gitignore)
+            print(f"{C.GRAY_DIM}📄 Created default .gitignore (Python/Node/Expo/editor patterns).{C.RESET}")
+
         # Ensure there's at least one commit on main before branching dev off it.
         has_commit = run(["git", "rev-parse", "HEAD"])
         if not has_commit.ok:
@@ -1253,7 +1347,7 @@ class Dashboard:
                     commit_res = git("commit", "--allow-empty", "-m", "chore: initial commit")
             print(commit_res.out or commit_res.err)
 
-        dev_res = git("checkout", "-b", "dev")
+        dev_res = git("switch", "-c", "dev")
         print(dev_res.out or dev_res.err)
 
         if dev_res.ok:
@@ -1261,6 +1355,17 @@ class Dashboard:
             print(f"{C.GRAY_DIM}   You're now on 'dev'. Use Option 6 to start a feature branch,{C.RESET}")
             print(f"{C.GRAY_DIM}   or Option 30 to connect a GitHub remote.{C.RESET}")
             self.refresh()
+
+            register_fn = getattr(registry, "register_project", None)
+            if callable(register_fn):
+                if confirm("Register this project for Option 27 (switch project)?"):
+                    try:
+                        register_fn(os.getcwd())
+                        print(f"{C.GREEN}✅ Registered with project switcher.{C.RESET}")
+                    except Exception as e:
+                        print(f"{C.RED}❌ Registration failed: {e}{C.RESET}")
+            else:
+                print(f"{C.GRAY_DIM}ℹ️  registry.py has no register_project() function — add this project to the switcher manually.{C.RESET}")
         pause()
 
     def _check_empty_branch_on_exit(self):
@@ -1273,12 +1378,235 @@ class Dashboard:
             return
         print(f"\n{C.YELLOW}💤 Branch '{self.branch}' has no commits ahead of dev.{C.RESET}")
         if confirm(f"Delete abandoned branch '{self.branch}' before exiting?"):
-            git("checkout", "dev")
+            git("switch", "dev")
             res = git("branch", "-d", self.branch)
             if res.ok:
                 print(f"{C.GREEN}🗑️  Deleted '{self.branch}'.{C.RESET}")
             else:
                 print(f"{C.RED}❌ Failed: {res.err}{C.RESET}")
+
+
+    def action_amend_commit(self):
+        """3a — Amend the most recent commit."""
+        if not self.require_repo():
+            return
+        if self.branch in ("main", "dev"):
+            print(f"{C.RED}❌ Error: GitFlow violation. Cannot amend on {self.branch}.{C.RESET}")
+            pause()
+            return
+        last_log = git("log", "-1", "--pretty=format:%h %s")
+        if not last_log.ok or not last_log.out:
+            print(f"{C.RED}❌ No commits found to amend.{C.RESET}")
+            pause()
+            return
+        print(f"{C.YELLOW}✏️  Last commit:{C.RESET} {last_log.out}")
+        diff = git("diff", "HEAD")
+        untracked = git("ls-files", "--others", "--exclude-standard")
+        if diff.out:
+            print(colorize_diff(diff.out))
+        if untracked.out:
+            print(f"{C.YELLOW}📄 Untracked files:{C.RESET}")
+            print(untracked.out)
+        if diff.out or untracked.out:
+            if confirm("Stage current changes into this commit?"):
+                git("add", ".")
+        new_msg = input("New commit message (blank = keep existing): ").strip()
+        if new_msg:
+            res = git("commit", "--amend", "-m", new_msg)
+        else:
+            res = git("commit", "--amend", "--no-edit")
+        print(res.out or res.err)
+        if res.ok:
+            toast("Commit amended.", icon="✏️")
+        pause()
+
+    def action_tag_management(self):
+        """32 — List, create, push, or delete tags."""
+        if not self.require_repo():
+            return
+        print(f"{C.GOLD}🏷️  Tag management{C.RESET}")
+        print("  1. List tags")
+        print("  2. Create tag")
+        print("  3. Push tag(s)")
+        print("  4. Delete tag")
+        choice = input("Choice: ").strip()
+
+        if choice == "1":
+            tags = git("tag", "-n")
+            print(tags.out or f"{C.GRAY_DIM}No tags found.{C.RESET}")
+
+        elif choice == "2":
+            name = input("Tag name (e.g., v1.2.0): ").strip()
+            if not name or not run(["git", "check-ref-format", "refs/tags/" + name]).ok:
+                print(f"{C.RED}❌ Invalid tag name.{C.RESET}")
+                pause()
+                return
+            msg = input("Tag message (blank = lightweight tag): ").strip()
+            res = git("tag", "-a", name, "-m", msg) if msg else git("tag", name)
+            print(res.out or res.err)
+            if res.ok:
+                toast(f"Tagged {name}", icon="🏷️")
+
+        elif choice == "3":
+            tags = git("tag")
+            if not tags.out:
+                print(f"{C.GRAY_DIM}No tags to push.{C.RESET}")
+            else:
+                print(tags.out)
+                name = input("Tag to push (blank = push all): ").strip()
+                res = git("push", "origin", name) if name else git("push", "origin", "--tags")
+                print(res.out or res.err)
+                if res.ok:
+                    toast("Tag(s) pushed.", icon="⬆️")
+
+        elif choice == "4":
+            tags = git("tag")
+            if not tags.out:
+                print(f"{C.GRAY_DIM}No tags found.{C.RESET}")
+                pause()
+                return
+            print(tags.out)
+            name = input("Tag to delete: ").strip()
+            if name and confirm(f"Delete tag '{name}' locally?"):
+                res = git("tag", "-d", name)
+                print(res.out or res.err)
+                if confirm("Also delete from remote?"):
+                    res2 = git("push", "origin", f":refs/tags/{name}")
+                    print(res2.out or res2.err)
+        else:
+            print(f"{C.RED}❌ Invalid choice.{C.RESET}")
+        pause()
+
+    def action_restore_file(self):
+        """33 — Discard local changes to a single file."""
+        if not self.require_repo():
+            return
+        status = git("status", "-s")
+        if not status.out:
+            print(f"{C.GREEN}✅ Working tree clean — nothing to restore.{C.RESET}")
+            pause()
+            return
+        print(f"{C.YELLOW}🧹 Changed files:{C.RESET}")
+        print(status.out)
+        fname = input("\nFile to restore (discard changes), blank to cancel: ").strip()
+        if not fname:
+            pause()
+            return
+        if not confirm(f"⚠️  Discard ALL changes to '{fname}'? This cannot be undone."):
+            pause()
+            return
+        res = git("checkout", "--", fname)
+        print(res.out or res.err)
+        if res.ok:
+            toast(f"Restored {fname}", icon="🧹")
+        pause()
+
+    def action_show_commit(self):
+        """34 — Show full diff/details for a commit."""
+        if not self.require_repo():
+            return
+        print(f"{C.YELLOW}Recent commits:{C.RESET}")
+        sha = self._paginated_commit_picker()
+        if not sha:
+            sha = "HEAD"
+        res = git("show", sha)
+        print(colorize_diff(res.out) if res.ok else res.err)
+        offer_clipboard(res.out, "commit details")
+        pause()
+
+    def action_blame_file(self):
+        """35 — git blame on a tracked file."""
+        if not self.require_repo():
+            return
+        tracked = git("ls-files")
+        print(f"{C.YELLOW}📄 Tracked files:{C.RESET}")
+        print(tracked.out)
+        fname = input("\nFile to blame: ").strip()
+        if not fname:
+            pause()
+            return
+        res = git("blame", fname)
+        print(res.out or res.err)
+        pause()
+
+    def action_remote_management(self):
+        """36 — Add, update, or remove remotes."""
+        if not self.require_repo():
+            return
+        print(f"{C.CYAN}🌐 Remote management{C.RESET}")
+        remotes = git("remote", "-v")
+        print(remotes.out or f"{C.GRAY_DIM}No remotes configured.{C.RESET}")
+        print("\n  1. Add remote")
+        print("  2. Change remote URL")
+        print("  3. Remove remote")
+        choice = input("Choice (blank to cancel): ").strip()
+
+        if choice == "1":
+            name = input("Remote name (e.g., origin): ").strip()
+            url = input("Remote URL: ").strip()
+            if name and url:
+                res = git("remote", "add", name, url)
+                print(res.out or res.err)
+                if res.ok:
+                    toast(f"Added remote {name}", icon="🌐")
+        elif choice == "2":
+            name = input("Remote name to update: ").strip()
+            url = input("New URL: ").strip()
+            if name and url:
+                res = git("remote", "set-url", name, url)
+                print(res.out or res.err)
+                if res.ok:
+                    toast(f"Updated {name}", icon="🌐")
+        elif choice == "3":
+            name = input("Remote name to remove: ").strip()
+            if name and confirm(f"Remove remote '{name}'?"):
+                res = git("remote", "remove", name)
+                print(res.out or res.err)
+        pause()
+
+    def action_file_history(self):
+        """37 — log --follow for a single file."""
+        if not self.require_repo():
+            return
+        tracked = git("ls-files")
+        print(f"{C.YELLOW}📄 Tracked files:{C.RESET}")
+        print(tracked.out)
+        fname = input("\nFile to view history for: ").strip()
+        if not fname:
+            pause()
+            return
+        res = git("log", "--oneline", "--follow", "--", fname)
+        print(res.out or f"{C.GRAY_DIM}No history found.{C.RESET}")
+        offer_clipboard(res.out, "file history")
+        pause()
+
+    def action_stash_inspect(self):
+        """38 — List stashes, inspect contents, optionally drop."""
+        if not self.require_repo():
+            return
+        stashes = git("stash", "list")
+        if not stashes.out:
+            print(f"{C.GREEN}✅ No stashes found.{C.RESET}")
+            pause()
+            return
+        print(f"{C.PINK}🔍 Stash list:{C.RESET}")
+        print(stashes.out)
+        ref = input("\nStash to inspect (e.g., stash@{0}), blank to cancel: ").strip()
+        if not ref:
+            pause()
+            return
+        if not re.match(r"^stash@\{\d+\}$", ref):
+            print(f"{C.RED}❌ Invalid stash reference. Expected format: stash@{{N}} (e.g., stash@{{0}}).{C.RESET}")
+            pause()
+            return
+        show = git("stash", "show", "-p", ref)
+        print(colorize_diff(show.out) if show.ok else show.err)
+        if confirm(f"\nDrop {ref}?"):
+            res = git("stash", "drop", ref)
+            print(res.out or res.err)
+            if res.ok:
+                toast(f"Dropped {ref}", icon="🗑️")
+        pause()
 
     # ── Main loop ─────────────────────────────────────────────────────────────
 
@@ -1315,7 +1643,26 @@ class Dashboard:
             "29": self.action_fix_detached_head,
             "30": self.action_setup_github,
             "31": self.action_git_init,
+            "3a": self.action_amend_commit,
+            "32": self.action_tag_management,
+            "33": self.action_restore_file,
+            "34": self.action_show_commit,
+            "35": self.action_blame_file,
+            "36": self.action_remote_management,
+            "37": self.action_file_history,
+            "38": self.action_stash_inspect,
         }
+
+        def run_action(choice):
+            action = dispatch.get(choice)
+            if action:
+                action()
+                usage = self.config.get("action_usage", {})
+                usage[choice] = usage.get(choice, 0) + 1
+                self.config.set("action_usage", usage)
+                return True
+            print(f"{C.RED}❌ Invalid choice{C.RESET}")
+            return False
 
         while True:
             self.print_header()
@@ -1326,11 +1673,21 @@ class Dashboard:
                 self._check_empty_branch_on_exit()
                 print(f"{C.PURPLE}👋 Catch you later.{C.RESET}")
                 break
-            action = dispatch.get(choice)
-            if action:
-                action()
-            else:
-                print(f"{C.RED}❌ Invalid choice{C.RESET}")
+
+            cat_key = choice.upper()
+            if cat_key in CATEGORIES:
+                while True:
+                    self.print_submenu(cat_key)
+                    sub_choice = input(f"\n{C.GREEN}❯{C.RESET} ").strip()
+                    if sub_choice.lower() == "b" or not sub_choice:
+                        break
+                    if sub_choice in CATEGORIES[cat_key][2]:
+                        run_action(sub_choice)
+                        break
+                    print(f"{C.RED}❌ Invalid choice for this category{C.RESET}")
+                continue
+
+            run_action(choice)
 
 
 def main():
