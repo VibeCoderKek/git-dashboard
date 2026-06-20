@@ -391,6 +391,7 @@ class Dashboard:
         return False
 
     def print_header(self):
+        print('\033c', end='')
         self.refresh()
 
         if self.branch == "main":
