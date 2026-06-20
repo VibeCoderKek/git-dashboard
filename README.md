@@ -28,7 +28,8 @@ main  <- stable releases only, tagged milestones
     feature/xyz  <- all work happens here
 ```
 
-- Never commit directly to `main` or `dev` — the dashboard blocks this.
+- Never commit directly to `main` or `dev` — the dashboard blocks this
+  (merge commits are the one exception, to finalize an in-progress merge).
 - All work happens on a feature branch off `dev` (Option 6, under Branching).
 - Feature branches merge to `dev` with `--no-ff` (Option 4), then get deleted.
 - `dev` to `main` only at milestones (Option 5), with an optional release tag.
@@ -40,9 +41,10 @@ type(scope): description
 ```
 
 Types: feat, fix, chore, docs, refactor, style, test, perf.
-Always created via Option 3 (Commit), never a raw `git commit`. The scope
-should match the paths actually changed — Option 3 warns (case-insensitively)
-when it doesn't.
+Always created via Option 3 (Commit) or Option 20 (Quick WIP), never a raw
+`git commit`. The scope should match the paths actually changed — Option 3
+warns (case-insensitively) when it doesn't, and remembers your last scope
+as a default for next time.
 
 ## Menu structure
 
@@ -50,34 +52,57 @@ The dashboard opens to a category list. Pick a letter to open that category,
 then a number to run the action, or `b` to go back. Your most-used actions
 also surface in a Favorites row at the top automatically.
 
-| Key | Category |
-|-----|----------|
-| W | Workflow - status, diff, commit, merge, milestone |
-| B | Branching - new/switch/delete branch, cleanup, staleness, switch project |
-| I | Inspect - show commit, blame, file history, search, graph, changelog |
-| T | Tags & Remote - tag management, push/pull/fetch, remote management |
-| S | Stash & Recovery - stash, restore file, resolve conflicts, .gitignore |
-| A | Advanced - squash, rebase, cherry-pick, worktree, edit file |
-| U | Setup - GitHub sign-in, git init, detached HEAD recovery |
+| Key | Category | Actions |
+|-----|----------|---------|
+| W | Workflow | 1 Status, 2 Diff (full), 2s Diff stat summary, 3 Commit, 3a Amend last commit, 3b Undo last commit, 20 Quick WIP commit, 4 Merge feature to dev, 5 Milestone merge to main |
+| B | Branching | 6 New feature branch, 7 Switch branch, 8 Cleanup merged branches, 9 Delete branch, 28 Branch staleness report, 27 Switch project |
+| I | Inspect | 34 Show commit, 35 Blame file, 37 File history, 26 Commit search, 16 Commit graph, 15 Generate changelog |
+| T | Tags & Remote | 32 Tag management, 17 Push to remote, 18 Pull from remote, 19 Fetch + prune, 36 Remote management |
+| S | Stash & Recovery | 11 Stash changes, 38 Stash list/inspect/drop, 12 Pop stash, 33 Restore file, 13 Resolve conflicts, 13a Abort operation, 25 .gitignore quick-add, 25a Untrack file |
+| A | Advanced | 14 Squash commits, 22 Interactive rebase, 23 Cherry-pick, 24 Worktree add, 10 Edit file, 10a Apply patch (batch) |
+| U | Setup | 30 GitHub sign-in, 31 Git init, 29 Fix detached HEAD |
 
 ## Notable behaviors
 
 - Scope mismatch check — warns at commit time if the entered scope doesn't
-  match the files actually changed (case-insensitive substring match).
+  match the files actually changed (case-insensitive substring match), and
+  lets you proceed anyway or abort to fix it.
 - Branch deletion safety — checks merge status against both `dev` and
-  `main` before warning a branch looks unmerged.
+  `main` before warning a branch looks unmerged; force-delete requires
+  explicit confirmation.
 - Pre-push lint — runs `py_compile` over tracked .py files before pushing;
   you can override and push anyway if needed.
 - Default .gitignore on init — Option 31 writes a sane Python/Node/Expo/
-  editor/env .gitignore on fresh repos, only if one doesn't already exist.
-- Detached HEAD recovery — Option 29 (and an automatic banner) offers to
-  branch off the current commit before you lose work.
+  editor/env .gitignore on fresh repos, only if one doesn't already exist,
+  and offers to register the project with the multi-repo switcher.
+- Detached HEAD recovery — Option 29 (and an automatic banner on the main
+  screen) offers to branch off the current commit before you lose work.
 - Empty branch cleanup — on exit, offers to delete a feature branch that
   never got any commits ahead of dev.
 - Branch staleness report — Option 28 lists branches by last-commit age
-  and flags anything over 30 days old.
-- Paginated commit pickers — cherry-pick and show-commit page through
-  history 10 at a time, or accept a raw SHA directly.
+  and flags anything 30+ days old as stale.
+- Paginated pickers — cherry-pick, show-commit, and apply-patch's file
+  picker page through results 10 at a time, or accept a raw SHA/path
+  typed directly.
+- Quick WIP commits — Option 20 snapshots all changes with a fixed
+  `chore(wip): snapshot` message, blocked on `main`/`dev` like Option 3.
+- Amend / undo — Option 3a amends the last commit (optionally restaging
+  current changes first); Option 3b soft-resets the last commit back to
+  staging. Both are blocked on `main`/`dev`.
+- Untrack file — Option 25a removes a file from git tracking with
+  `git rm --cached` while keeping the local copy, and auto-appends it to
+  `.gitignore` if it isn't already there.
+- Tag management — Option 32 lists, creates (annotated or lightweight),
+  pushes, and deletes tags (locally and on remote).
+- Remote management — Option 36 adds, updates, or removes remotes beyond
+  just `origin`.
+- Stash inspect/drop — Option 38 lists stashes, shows the diff for a
+  specific one, and offers to drop it.
+- Abort operation — Option 13a detects an in-progress merge, cherry-pick,
+  or rebase and aborts it after confirmation.
+- GitHub sign-in — Option 30 sets the `origin` remote from a username/repo
+  and stores a PAT via git's credential store so later pushes/pulls
+  (Options 17/18) don't prompt for credentials.
 - Favorites — the 4 most-used menu actions surface at the top automatically.
 
 ## Workflow rules for anyone (human or AI) touching this codebase
