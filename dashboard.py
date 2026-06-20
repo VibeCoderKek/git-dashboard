@@ -103,6 +103,16 @@ ACTION_LABELS = {
     "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
 }
 
+CATEGORIES = {
+    "W": ("📋 WORKFLOW", C.GOLD, ["1", "2", "2s", "3", "3a", "20", "4", "5"]),
+    "B": ("🌿 BRANCHING", C.GREEN, ["6", "7", "8", "9", "28", "27"]),
+    "I": ("🔬 INSPECT", C.CYAN, ["34", "35", "37", "26", "16", "15"]),
+    "T": ("🏷️  TAGS & REMOTE", C.GOLD, ["32", "17", "18", "19", "36"]),
+    "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "25"]),
+    "A": ("⚙️  ADVANCED", C.PINK, ["14", "22", "23", "24", "10"]),
+    "U": ("🔐 SETUP", C.PINK, ["30", "31", "29"]),
+}
+
 BANNER_LINES = [
     "██████╗  ██╗ ███████╗",
     "██╔════╝ ██║ ╚══██╔══╝",
@@ -447,60 +457,22 @@ class Dashboard:
                 label = ACTION_LABELS.get(choice, choice)
                 print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{choice:>3}.{C.RESET} {label}")
             print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.GOLD}📋 WORKFLOW{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 1.{C.RESET} 👀 Status")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 2.{C.RESET} 🔍 Diff (full)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}2s.{C.RESET} 📊 Diff stat summary")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 3.{C.RESET} 💾 Commit to feature branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}3a.{C.RESET} ✏️  Amend last commit")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}20.{C.RESET} ⚡ Quick WIP commit")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 4.{C.RESET} 🔀 Merge feature → dev (--no-ff)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 5.{C.RESET} 🏆 Milestone: merge dev → main")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.GREEN}🌿 BRANCHING{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 6.{C.RESET} 🌱 New feature branch (off dev)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 7.{C.RESET} 🔁 Switch branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 8.{C.RESET} 🧹 Cleanup merged branches")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 9.{C.RESET} 🗑️  Delete branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}28.{C.RESET} 📅 Branch staleness report")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}27.{C.RESET} 🔮 Switch project")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.CYAN}🔬 INSPECT{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}34.{C.RESET} 🔬 Show commit")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}35.{C.RESET} 👁️  Blame file")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}37.{C.RESET} 📄 File history (log -- file)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}26.{C.RESET} 🔎 Commit search (log --grep)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}16.{C.RESET} 🌐 Commit graph")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}15.{C.RESET} 📜 Generate changelog")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.GOLD}🏷️  TAGS & REMOTE{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}32.{C.RESET} 🏷️  Tag management (list/create/push/delete)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}17.{C.RESET} ⬆️  Push to remote")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}18.{C.RESET} ⬇️  Pull from remote")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}19.{C.RESET} 🔄 Fetch + prune")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}36.{C.RESET} 🌐 Remote management")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.PINK}📦 STASH & RECOVERY{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}11.{C.RESET} 📦 Stash changes")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}38.{C.RESET} 🔍 Stash list / inspect / drop")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}12.{C.RESET} 📤 Pop stash")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}33.{C.RESET} 🧹 Restore file (discard changes)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}13.{C.RESET} 🩹 Resolve conflicts")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}25.{C.RESET} 📄 .gitignore quick-add")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.PINK}⚙️  ADVANCED{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}14.{C.RESET} 🪓 Squash commits (soft reset)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}22.{C.RESET} 🔃 Interactive rebase (onto dev)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}23.{C.RESET} 🍒 Cherry-pick from branch")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}24.{C.RESET} 🌲 Worktree add")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}10.{C.RESET} 📝 Edit file")
-        print(f"{C.GRAY}│{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET} {C.PINK}🔐 SETUP{C.RESET}")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}30.{C.RESET} 🔑 GitHub sign-in (save credentials)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}31.{C.RESET} 🆕 Git init (main + dev)")
-        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}29.{C.RESET} 🏥 Fix detached HEAD → create branch")
+        print(f"{C.GRAY}│{C.RESET} {C.GOLD}CATEGORIES{C.RESET}")
+        for key, (title, color, _) in CATEGORIES.items():
+            print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{key}.{C.RESET}  {color}{title}{C.RESET}")
         print(f"{C.GRAY}│{C.RESET}")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE}21.{C.RESET} {C.RED}🚪 Exit{C.RESET}")
+        print(f"{C.GRAY}└{DASHES}┘{C.RESET}")
+
+    def print_submenu(self, key):
+        title, color, numbers = CATEGORIES[key]
+        print(f"{C.GRAY}┌{DASHES}┐{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET} {color}{title}{C.RESET}")
+        for num in numbers:
+            label = ACTION_LABELS.get(num, num)
+            print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{num:>3}.{C.RESET} {label}")
+        print(f"{C.GRAY}│{C.RESET}")
+        print(f"{C.GRAY}│{C.RESET}  {C.BLUE}b.{C.RESET}  {C.GRAY_DIM}← Back{C.RESET}")
         print(f"{C.GRAY}└{DASHES}┘{C.RESET}")
 
     # ── Existing actions (unchanged) ──────────────────────────────────────────
@@ -1681,6 +1653,17 @@ class Dashboard:
             "38": self.action_stash_inspect,
         }
 
+        def run_action(choice):
+            action = dispatch.get(choice)
+            if action:
+                action()
+                usage = self.config.get("action_usage", {})
+                usage[choice] = usage.get(choice, 0) + 1
+                self.config.set("action_usage", usage)
+                return True
+            print(f"{C.RED}❌ Invalid choice{C.RESET}")
+            return False
+
         while True:
             self.print_header()
             self.print_menu()
@@ -1690,14 +1673,21 @@ class Dashboard:
                 self._check_empty_branch_on_exit()
                 print(f"{C.PURPLE}👋 Catch you later.{C.RESET}")
                 break
-            action = dispatch.get(choice)
-            if action:
-                action()
-                usage = self.config.get("action_usage", {})
-                usage[choice] = usage.get(choice, 0) + 1
-                self.config.set("action_usage", usage)
-            else:
-                print(f"{C.RED}❌ Invalid choice{C.RESET}")
+
+            cat_key = choice.upper()
+            if cat_key in CATEGORIES:
+                while True:
+                    self.print_submenu(cat_key)
+                    sub_choice = input(f"\n{C.GREEN}❯{C.RESET} ").strip()
+                    if sub_choice.lower() == "b" or not sub_choice:
+                        break
+                    if sub_choice in CATEGORIES[cat_key][2]:
+                        run_action(sub_choice)
+                        break
+                    print(f"{C.RED}❌ Invalid choice for this category{C.RESET}")
+                continue
+
+            run_action(choice)
 
 
 def main():
