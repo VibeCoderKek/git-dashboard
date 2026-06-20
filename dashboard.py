@@ -14,6 +14,7 @@ import json
 import getpass
 import py_compile
 import tempfile
+import difflib
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -99,7 +100,7 @@ ACTION_LABELS = {
     "11": "📦 Stash changes", "38": "🔍 Stash list/inspect/drop", "12": "📤 Pop stash",
     "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "13a": "🛑 Abort operation", "25": "📄 .gitignore quick-add",
     "14": "🪓 Squash commits", "22": "🔃 Interactive rebase", "23": "🍒 Cherry-pick",
-    "24": "🌲 Worktree add", "10": "📝 Edit file",
+    "24": "🌲 Worktree add", "10": "📝 Edit file", "10a": "🩹 Apply text patch",
     "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
 }
 
@@ -109,7 +110,7 @@ CATEGORIES = {
     "I": ("🔬 INSPECT", C.CYAN, ["34", "35", "37", "26", "16", "15"]),
     "T": ("🏷️  TAGS & REMOTE", C.GOLD, ["32", "17", "18", "19", "36"]),
     "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "13a", "25"]),
-    "A": ("⚙️  ADVANCED", C.PINK, ["14", "22", "23", "24", "10"]),
+    "A": ("⚙️  ADVANCED", C.PINK, ["14", "22", "23", "24", "10", "10a"]),
     "U": ("🔐 SETUP", C.PINK, ["30", "31", "29"]),
 }
 
@@ -758,6 +759,105 @@ class Dashboard:
         if fname:
             editor = "nvim" if shutil.which("nvim") else ("nano" if shutil.which("nano") else "vi")
             subprocess.call([editor, fname])
+        pause()
+
+    def action_apply_patch(self):
+        if not self.require_repo():
+            return
+        if self.branch in ("main", "dev", "unknown"):
+            print(f"{C.RED}❌ Error: Must be on a feature branch to apply a patch.{C.RESET}")
+            pause()
+            return
+
+        path = input("File path to patch: ").strip()
+        mode = input("Mode — [t]argeted replace or [f]ull rewrite? ").strip().lower()
+        if mode not in ("t", "f"):
+            print(f"{C.RED}❌ Invalid mode.{C.RESET}")
+            pause()
+            return
+
+        sentinel = input("Sentinel to end each paste (default EOF): ").strip() or "EOF"
+
+        def read_block(label):
+            print(f"{C.GRAY_DIM}Paste {label}, then a line with only '{sentinel}':{C.RESET}")
+            lines = []
+            while True:
+                try:
+                    line = input()
+                except EOFError:
+                    break
+                if line.strip() == sentinel:
+                    break
+                lines.append(line)
+            return "\n".join(lines)
+
+        if mode == "t":
+            if not os.path.isfile(path):
+                print(f"{C.RED}❌ File not found: {path}{C.RESET}")
+                pause()
+                return
+            with open(path, "r") as f:
+                original = f.read()
+
+            old = read_block("OLD text block")
+            new = read_block("NEW text block")
+
+            count = original.count(old)
+            if count == 0:
+                print(f"{C.RED}❌ WARNING: anchor not found in {path}. No changes made.{C.RESET}")
+                pause()
+                return
+            if count > 1:
+                print(f"{C.YELLOW}⚠️  Anchor appears {count} times — ambiguous. Aborting.{C.RESET}")
+                pause()
+                return
+
+            patched = original.replace(old, new, 1)
+        else:
+            original = open(path, "r").read() if os.path.isfile(path) else ""
+            patched = read_block("FULL new file content")
+
+        diff_lines = list(difflib.unified_diff(
+            original.splitlines(keepends=True),
+            patched.splitlines(keepends=True),
+            fromfile=path, tofile=path,
+        ))
+        if not diff_lines:
+            print(f"{C.YELLOW}⚠️  No changes detected.{C.RESET}")
+            pause()
+            return
+
+        print(f"{C.YELLOW}--- Preview ---{C.RESET}")
+        for line in diff_lines:
+            if line.startswith("+") and not line.startswith("+++"):
+                print(f"{C.GREEN}{line.rstrip()}{C.RESET}")
+            elif line.startswith("-") and not line.startswith("---"):
+                print(f"{C.RED}{line.rstrip()}{C.RESET}")
+            else:
+                print(line.rstrip())
+
+        if not confirm(f"Write {len(patched.splitlines())} line(s) to {path}?"):
+            pause()
+            return
+
+        with open(path, "w") as f:
+            f.write(patched)
+
+        if path.endswith(".py"):
+            try:
+                py_compile.compile(path, doraise=True)
+                print(f"{C.GREEN}✅ Syntax check passed.{C.RESET}")
+            except py_compile.PyCompileError as e:
+                print(f"{C.RED}❌ Syntax error after patch: {e}{C.RESET}")
+                if confirm("Revert file to pre-patch content?"):
+                    with open(path, "w") as f:
+                        f.write(original)
+                    print(f"{C.YELLOW}↩️  Reverted {path}.{C.RESET}")
+                    pause()
+                    return
+
+        print(f"{C.GREEN}✅ Patched {path}.{C.RESET}")
+        toast(f"Patched {path}", icon="🩹")
         pause()
 
     def action_stash(self):
@@ -1677,6 +1777,7 @@ class Dashboard:
             "8":  self.action_cleanup_branches,
             "9":  self.action_delete_branch,
             "10": self.action_edit_file,
+            "10a": self.action_apply_patch,
             "11": self.action_stash,
             "12": self.action_stash_pop,
             "13": self.action_resolve_conflicts,
