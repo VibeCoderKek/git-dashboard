@@ -97,7 +97,7 @@ ACTION_LABELS = {
     "32": "🏷️  Tag management", "17": "⬆️  Push to remote", "18": "⬇️  Pull from remote",
     "19": "🔄 Fetch + prune", "36": "🌐 Remote management",
     "11": "📦 Stash changes", "38": "🔍 Stash list/inspect/drop", "12": "📤 Pop stash",
-    "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "25": "📄 .gitignore quick-add",
+    "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "13a": "🛑 Abort operation", "25": "📄 .gitignore quick-add",
     "14": "🪓 Squash commits", "22": "🔃 Interactive rebase", "23": "🍒 Cherry-pick",
     "24": "🌲 Worktree add", "10": "📝 Edit file",
     "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
@@ -108,7 +108,7 @@ CATEGORIES = {
     "B": ("🌿 BRANCHING", C.GREEN, ["6", "7", "8", "9", "28", "27"]),
     "I": ("🔬 INSPECT", C.CYAN, ["34", "35", "37", "26", "16", "15"]),
     "T": ("🏷️  TAGS & REMOTE", C.GOLD, ["32", "17", "18", "19", "36"]),
-    "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "25"]),
+    "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "13a", "25"]),
     "A": ("⚙️  ADVANCED", C.PINK, ["14", "22", "23", "24", "10"]),
     "U": ("🔐 SETUP", C.PINK, ["30", "31", "29"]),
 }
@@ -772,6 +772,39 @@ class Dashboard:
             return
         res = git("stash", "pop")
         print(res.out or res.err)
+        pause()
+
+    def action_abort_operation(self):
+        if not self.require_repo():
+            return
+        git_dir = ".git"
+        merge_head = os.path.join(git_dir, "MERGE_HEAD")
+        cherry_pick_head = os.path.join(git_dir, "CHERRY_PICK_HEAD")
+        rebase_merge = os.path.join(git_dir, "rebase-merge")
+        rebase_apply = os.path.join(git_dir, "rebase-apply")
+
+        if os.path.exists(merge_head):
+            op_name, abort_args = "merge", ("merge", "--abort")
+        elif os.path.exists(cherry_pick_head):
+            op_name, abort_args = "cherry-pick", ("cherry-pick", "--abort")
+        elif os.path.exists(rebase_merge) or os.path.exists(rebase_apply):
+            op_name, abort_args = "rebase", ("rebase", "--abort")
+        else:
+            print(f"{C.GREEN}✅ No in-progress merge, cherry-pick, or rebase detected.{C.RESET}")
+            pause()
+            return
+
+        print(f"{C.YELLOW}⚠️  In-progress {op_name} detected.{C.RESET}")
+        if not confirm(f"Abort the {op_name}? This discards all in-progress changes from it."):
+            pause()
+            return
+
+        result = git(*abort_args)
+        if result.ok:
+            print(f"{C.GREEN}✅ {op_name.capitalize()} aborted. Working tree restored.{C.RESET}")
+            toast(f"{op_name.capitalize()} aborted.", icon="🛑")
+        else:
+            print(f"{C.RED}❌ Abort failed: {result.err}{C.RESET}")
         pause()
 
     def action_resolve_conflicts(self):
@@ -1647,6 +1680,7 @@ class Dashboard:
             "11": self.action_stash,
             "12": self.action_stash_pop,
             "13": self.action_resolve_conflicts,
+            "13a": self.action_abort_operation,
             "14": self.action_squash,
             "15": self.action_changelog,
             "16": self.action_graph,
