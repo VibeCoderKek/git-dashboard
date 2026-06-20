@@ -980,6 +980,59 @@ class Dashboard:
         subprocess.call(["git", "rebase", "-i", "dev"], env=env)
         pause()
 
+    def _paginated_commit_picker(self, ref=None, page_size=10):
+        """
+        Page through commits (optionally on a given ref/branch) and let the
+        user pick one by number, type 'm' for more, or type a raw SHA/partial
+        SHA directly even if it's outside the currently shown page.
+        Returns the chosen SHA string, or None if cancelled.
+        """
+        skip = 0
+        shown = []
+        while True:
+            args = ["log", "--oneline", f"--skip={skip}", f"-{page_size}"]
+            if ref:
+                args.append(ref)
+            page = git(*args)
+            if not page.out:
+                if not shown:
+                    print(f"{C.RED}❌ No commits found.{C.RESET}")
+                    return None
+                print(f"{C.GRAY_DIM}(no more commits){C.RESET}")
+            else:
+                new_lines = page.out.split("\n")
+                shown.extend(new_lines)
+                start_idx = len(shown) - len(new_lines) + 1
+                for i, c in enumerate(new_lines, start_idx):
+                    sha = c.split(" ", 1)[0]
+                    msg = c.split(" ", 1)[1] if " " in c else ""
+                    print(f"  {C.BLUE}{i}.{C.RESET} {C.GOLD}{sha}{C.RESET} {msg}")
+
+            choice = input(
+                f"\nNumber to select, {C.GRAY_DIM}'m'{C.RESET} for more, "
+                f"or paste a SHA directly (blank to cancel): "
+            ).strip()
+
+            if not choice:
+                return None
+            if choice.lower() == "m":
+                skip += page_size
+                continue
+            try:
+                idx = int(choice)
+                if 1 <= idx <= len(shown):
+                    return shown[idx - 1].split(" ", 1)[0]
+                print(f"{C.RED}❌ Number out of range.{C.RESET}")
+                continue
+            except ValueError:
+                pass
+
+            # Treat as a raw SHA/partial SHA — verify it resolves
+            verify = git("rev-parse", "--verify", "--quiet", choice)
+            if verify.ok:
+                return choice
+            print(f"{C.RED}❌ '{choice}' is not a valid commit reference.{C.RESET}")
+
     def action_cherry_pick(self):
         """23 — list commits from another branch, pick one by number."""
         if not self.require_repo():
@@ -1003,24 +1056,10 @@ class Dashboard:
             pause()
             return
 
-        log = git("log", "--oneline", "-20", src_branch)
-        if not log.out:
-            print(f"{C.RED}❌ No commits found on {src_branch}.{C.RESET}")
-            pause()
-            return
-
-        commits = log.out.split("\n")
-        print(f"\n{C.YELLOW}Recent commits on {src_branch}:{C.RESET}")
-        for i, c in enumerate(commits, 1):
-            sha = c.split(" ", 1)[0]
-            msg = c.split(" ", 1)[1] if " " in c else ""
-            print(f"  {C.BLUE}{i}.{C.RESET} {C.GOLD}{sha}{C.RESET} {msg}")
-
-        pick = input("\nCommit number to cherry-pick: ").strip()
-        try:
-            target = commits[int(pick) - 1].split(" ", 1)[0]
-        except (ValueError, IndexError):
-            print(f"{C.RED}❌ Invalid selection.{C.RESET}")
+        print(f"\n{C.YELLOW}Commits on {src_branch}:{C.RESET}")
+        target = self._paginated_commit_picker(ref=src_branch)
+        if not target:
+            print(f"{C.GRAY_DIM}Cancelled.{C.RESET}")
             pause()
             return
 
@@ -1468,10 +1507,10 @@ class Dashboard:
         """34 — Show full diff/details for a commit."""
         if not self.require_repo():
             return
-        log = git("log", "--oneline", "-10")
         print(f"{C.YELLOW}Recent commits:{C.RESET}")
-        print(log.out)
-        sha = input("\nCommit SHA to show (blank = HEAD): ").strip() or "HEAD"
+        sha = self._paginated_commit_picker()
+        if not sha:
+            sha = "HEAD"
         res = git("show", sha)
         print(colorize_diff(res.out) if res.ok else res.err)
         offer_clipboard(res.out, "commit details")
