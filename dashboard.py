@@ -85,6 +85,24 @@ TYPE_TITLES = {
     "other": "🔧 Other",
 }
 
+ACTION_LABELS = {
+    "1": "👀 Status", "2": "🔍 Diff (full)", "2s": "📊 Diff stat summary",
+    "3": "💾 Commit", "3a": "✏️  Amend last commit", "20": "⚡ Quick WIP commit",
+    "4": "🔀 Merge feature → dev", "5": "🏆 Milestone merge → main",
+    "6": "🌱 New feature branch", "7": "🔁 Switch branch",
+    "8": "🧹 Cleanup merged branches", "9": "🗑️  Delete branch",
+    "28": "📅 Branch staleness report", "27": "🔮 Switch project",
+    "34": "🔬 Show commit", "35": "👁️  Blame file", "37": "📄 File history",
+    "26": "🔎 Commit search", "16": "🌐 Commit graph", "15": "📜 Generate changelog",
+    "32": "🏷️  Tag management", "17": "⬆️  Push to remote", "18": "⬇️  Pull from remote",
+    "19": "🔄 Fetch + prune", "36": "🌐 Remote management",
+    "11": "📦 Stash changes", "38": "🔍 Stash list/inspect/drop", "12": "📤 Pop stash",
+    "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "25": "📄 .gitignore quick-add",
+    "14": "🪓 Squash commits", "22": "🔃 Interactive rebase", "23": "🍒 Cherry-pick",
+    "24": "🌲 Worktree add", "10": "📝 Edit file",
+    "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
+}
+
 BANNER_LINES = [
     "██████╗  ██╗ ███████╗",
     "██╔════╝ ██║ ╚══██╔══╝",
@@ -420,7 +438,15 @@ class Dashboard:
         print()
 
     def print_menu(self):
+        usage = self.config.get("action_usage", {})
+        top = sorted(usage.items(), key=lambda kv: kv[1], reverse=True)[:4]
         print(f"{C.GRAY}┌{DASHES}┐{C.RESET}")
+        if top:
+            print(f"{C.GRAY}│{C.RESET} {C.GOLD}⭐ FAVORITES{C.RESET}")
+            for choice, _ in top:
+                label = ACTION_LABELS.get(choice, choice)
+                print(f"{C.GRAY}│{C.RESET}  {C.BLUE}{choice:>3}.{C.RESET} {label}")
+            print(f"{C.GRAY}│{C.RESET}")
         print(f"{C.GRAY}│{C.RESET} {C.GOLD}📋 WORKFLOW{C.RESET}")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 1.{C.RESET} 👀 Status")
         print(f"{C.GRAY}│{C.RESET}  {C.BLUE} 2.{C.RESET} 🔍 Diff (full)")
@@ -1667,6 +1693,9 @@ class Dashboard:
             action = dispatch.get(choice)
             if action:
                 action()
+                usage = self.config.get("action_usage", {})
+                usage[choice] = usage.get(choice, 0) + 1
+                self.config.set("action_usage", usage)
             else:
                 print(f"{C.RED}❌ Invalid choice{C.RESET}")
 
