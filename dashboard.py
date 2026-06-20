@@ -87,7 +87,7 @@ TYPE_TITLES = {
 
 ACTION_LABELS = {
     "1": "👀 Status", "2": "🔍 Diff (full)", "2s": "📊 Diff stat summary",
-    "3": "💾 Commit", "3a": "✏️  Amend last commit", "20": "⚡ Quick WIP commit",
+    "3": "💾 Commit", "3a": "✏️  Amend last commit", "3b": "⏪ Undo last commit", "20": "⚡ Quick WIP commit",
     "4": "🔀 Merge feature → dev", "5": "🏆 Milestone merge → main",
     "6": "🌱 New feature branch", "7": "🔁 Switch branch",
     "8": "🧹 Cleanup merged branches", "9": "🗑️  Delete branch",
@@ -104,7 +104,7 @@ ACTION_LABELS = {
 }
 
 CATEGORIES = {
-    "W": ("📋 WORKFLOW", C.GOLD, ["1", "2", "2s", "3", "3a", "20", "4", "5"]),
+    "W": ("📋 WORKFLOW", C.GOLD, ["1", "2", "2s", "3", "3a", "3b", "20", "4", "5"]),
     "B": ("🌿 BRANCHING", C.GREEN, ["6", "7", "8", "9", "28", "27"]),
     "I": ("🔬 INSPECT", C.CYAN, ["34", "35", "37", "26", "16", "15"]),
     "T": ("🏷️  TAGS & REMOTE", C.GOLD, ["32", "17", "18", "19", "36"]),
@@ -805,6 +805,26 @@ class Dashboard:
         git("add", ".")
         print(f"{C.GREEN}✅ Changes staged! Use Option 3 to finalize the merge commit.{C.RESET}")
         toast("Conflicts staged.", icon="🩹")
+        pause()
+
+    def action_undo_commit(self):
+        if not self.require_repo():
+            return
+        if self.branch in ("main", "dev", "unknown"):
+            print(f"{C.RED}❌ Error: Must be on a feature branch to undo a commit.{C.RESET}")
+            pause()
+            return
+        log_res = git("log", "-1", "--oneline")
+        last_commit = log_res.out if log_res.ok and log_res.out else "(unknown)"
+        print(f"{C.YELLOW}⏪ Last commit: {last_commit}{C.RESET}")
+        if not confirm("Soft reset HEAD~1? Changes will return to the staging area."):
+            pause()
+            return
+        result = git("reset", "--soft", "HEAD~1")
+        if result.ok:
+            print(f"{C.GREEN}✅ Last commit undone. Changes are staged.{C.RESET}")
+        else:
+            print(f"{C.RED}❌ Undo failed: {result.err}{C.RESET}")
         pause()
 
     def action_squash(self):
@@ -1645,6 +1665,7 @@ class Dashboard:
             "30": self.action_setup_github,
             "31": self.action_git_init,
             "3a": self.action_amend_commit,
+            "3b": self.action_undo_commit,
             "32": self.action_tag_management,
             "33": self.action_restore_file,
             "34": self.action_show_commit,
