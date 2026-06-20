@@ -100,7 +100,7 @@ ACTION_LABELS = {
     "11": "📦 Stash changes", "38": "🔍 Stash list/inspect/drop", "12": "📤 Pop stash",
     "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "13a": "🛑 Abort operation", "25": "📄 .gitignore quick-add", "25a": "🙈 Untrack file",
     "14": "🪓 Squash commits", "22": "🔃 Interactive rebase", "23": "🍒 Cherry-pick",
-    "24": "🌲 Worktree add", "10": "📝 Edit file", "10a": "🩹 Apply text patch",
+    "24": "🌲 Worktree add", "10": "📝 Edit file", "10a": "🩹 Apply patch (batch)",
     "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
 }
 
@@ -769,7 +769,12 @@ class Dashboard:
             pause()
             return
 
-        path = input("File path to patch: ").strip()
+        path = self._paginated_file_picker()
+        if not path:
+            print(f"{C.GRAY_DIM}Cancelled.{C.RESET}")
+            pause()
+            return
+
         mode = input("Mode — [t]argeted replace or [f]ull rewrite? ").strip().lower()
         if mode not in ("t", "f"):
             print(f"{C.RED}❌ Invalid mode.{C.RESET}")
@@ -791,6 +796,8 @@ class Dashboard:
                 lines.append(line)
             return "\n".join(lines)
 
+        pairs = []
+
         if mode == "t":
             if not os.path.isfile(path):
                 print(f"{C.RED}❌ File not found: {path}{C.RESET}")
@@ -799,20 +806,30 @@ class Dashboard:
             with open(path, "r") as f:
                 original = f.read()
 
-            old = read_block("OLD text block")
-            new = read_block("NEW text block")
+            edit_num = 1
+            while True:
+                old = read_block(f"OLD text block #{edit_num}")
+                new = read_block(f"NEW text block #{edit_num}")
+                pairs.append((old, new))
+                again = input("Add another edit? (y/N): ").strip().lower()
+                if again != "y":
+                    break
+                edit_num += 1
 
-            count = original.count(old)
-            if count == 0:
-                print(f"{C.RED}❌ WARNING: anchor not found in {path}. No changes made.{C.RESET}")
+            missing = [i for i, (old, new) in enumerate(pairs, 1) if old not in original]
+            if missing:
+                print(f"{C.RED}❌ WARNING: anchor not found for edit #{missing}. No changes made.{C.RESET}")
                 pause()
                 return
-            if count > 1:
-                print(f"{C.YELLOW}⚠️  Anchor appears {count} times — ambiguous. Aborting.{C.RESET}")
+            ambiguous = [i for i, (old, new) in enumerate(pairs, 1) if original.count(old) > 1]
+            if ambiguous:
+                print(f"{C.YELLOW}⚠️  Anchor for edit #{ambiguous} appears multiple times — ambiguous. Aborting.{C.RESET}")
                 pause()
                 return
 
-            patched = original.replace(old, new, 1)
+            patched = original
+            for old, new in pairs:
+                patched = patched.replace(old, new, 1)
         else:
             original = open(path, "r").read() if os.path.isfile(path) else ""
             patched = read_block("FULL new file content")
@@ -836,7 +853,8 @@ class Dashboard:
             else:
                 print(line.rstrip())
 
-        if not confirm(f"Write {len(patched.splitlines())} line(s) to {path}?"):
+        edit_count = len(pairs) if mode == "t" else 1
+        if not confirm(f"Apply {edit_count} edit(s) and write {len(patched.splitlines())} line(s) to {path}?"):
             pause()
             return
 
@@ -1131,6 +1149,46 @@ class Dashboard:
         env = {**os.environ, "GIT_SEQUENCE_EDITOR": editor}
         subprocess.call(["git", "rebase", "-i", "dev"], env=env)
         pause()
+
+    def _paginated_file_picker(self, page_size=10):
+        """
+        Page through tracked files and let the user pick one by number,
+        type 'm' for more, or type a raw path directly (even a new,
+        untracked path) outside the currently shown page.
+        Returns the chosen path string, or None if cancelled.
+        """
+        all_files = [f for f in git("ls-files").out.split("\n") if f]
+        if not all_files:
+            print(f"{C.RED}❌ No tracked files found.{C.RESET}")
+            return None
+
+        skip = 0
+        while True:
+            page = all_files[skip:skip + page_size]
+            if not page:
+                print(f"{C.GRAY_DIM}(no more files){C.RESET}")
+            else:
+                for i, fpath in enumerate(page, skip + 1):
+                    print(f"  {C.BLUE}{i}.{C.RESET} {fpath}")
+
+            choice = input(
+                f"\nNumber to select, {C.GRAY_DIM}'m'{C.RESET} for more, "
+                f"or type a path directly (blank to cancel): "
+            ).strip()
+
+            if not choice:
+                return None
+            if choice.lower() == "m":
+                skip += page_size
+                continue
+            try:
+                idx = int(choice)
+                if 1 <= idx <= len(all_files):
+                    return all_files[idx - 1]
+                print(f"{C.RED}❌ Number out of range.{C.RESET}")
+                continue
+            except ValueError:
+                return choice
 
     def _paginated_commit_picker(self, ref=None, page_size=10):
         """
