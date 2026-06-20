@@ -98,7 +98,7 @@ ACTION_LABELS = {
     "32": "🏷️  Tag management", "17": "⬆️  Push to remote", "18": "⬇️  Pull from remote",
     "19": "🔄 Fetch + prune", "36": "🌐 Remote management",
     "11": "📦 Stash changes", "38": "🔍 Stash list/inspect/drop", "12": "📤 Pop stash",
-    "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "13a": "🛑 Abort operation", "25": "📄 .gitignore quick-add",
+    "33": "🧹 Restore file", "13": "🩹 Resolve conflicts", "13a": "🛑 Abort operation", "25": "📄 .gitignore quick-add", "25a": "🙈 Untrack file",
     "14": "🪓 Squash commits", "22": "🔃 Interactive rebase", "23": "🍒 Cherry-pick",
     "24": "🌲 Worktree add", "10": "📝 Edit file", "10a": "🩹 Apply text patch",
     "30": "🔑 GitHub sign-in", "31": "🆕 Git init", "29": "🏥 Fix detached HEAD",
@@ -109,7 +109,7 @@ CATEGORIES = {
     "B": ("🌿 BRANCHING", C.GREEN, ["6", "7", "8", "9", "28", "27"]),
     "I": ("🔬 INSPECT", C.CYAN, ["34", "35", "37", "26", "16", "15"]),
     "T": ("🏷️  TAGS & REMOTE", C.GOLD, ["32", "17", "18", "19", "36"]),
-    "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "13a", "25"]),
+    "S": ("📦 STASH & RECOVERY", C.PINK, ["11", "38", "12", "33", "13", "13a", "25", "25a"]),
     "A": ("⚙️  ADVANCED", C.PINK, ["14", "22", "23", "24", "10", "10a"]),
     "U": ("🔐 SETUP", C.PINK, ["30", "31", "29"]),
 }
@@ -1272,6 +1272,50 @@ class Dashboard:
         toast(f"Added '{pattern}' to .gitignore", icon="📄")
         pause()
 
+    def action_untrack_file(self):
+        """25a — git rm --cached + auto-append to .gitignore, local copy kept."""
+        if not self.require_repo():
+            return
+        tracked = git("ls-files")
+        print(f"{C.YELLOW}📄 Tracked files:{C.RESET}")
+        print(tracked.out)
+        fname = input("\nFile to untrack (keep local copy): ").strip()
+        if not fname:
+            pause()
+            return
+        if fname not in tracked.out.split("\n"):
+            print(f"{C.RED}❌ '{fname}' is not a tracked file.{C.RESET}")
+            pause()
+            return
+
+        if not confirm(f"Untrack '{fname}'? It stays on disk but is removed from git tracking."):
+            pause()
+            return
+
+        result = git("rm", "--cached", fname)
+        if not result.ok:
+            print(f"{C.RED}❌ Untrack failed: {result.err}{C.RESET}")
+            pause()
+            return
+        print(f"{C.GREEN}✅ Untracked '{fname}' (local copy kept).{C.RESET}")
+
+        gitignore_path = ".gitignore"
+        already_ignored = False
+        if os.path.isfile(gitignore_path):
+            with open(gitignore_path) as f:
+                existing = f.read()
+            already_ignored = fname in existing.split("\n")
+
+        if already_ignored:
+            print(f"{C.YELLOW}⚠️  '{fname}' already in .gitignore.{C.RESET}")
+        else:
+            with open(gitignore_path, "a") as f:
+                f.write(f"\n{fname}\n")
+            print(f"{C.GREEN}✅ Added '{fname}' to .gitignore{C.RESET}")
+
+        toast(f"Untracked '{fname}'", icon="🙈")
+        pause()
+
     def action_commit_search(self):
         """26 — git log --grep wrapper."""
         if not self.require_repo():
@@ -1793,6 +1837,7 @@ class Dashboard:
             "23": self.action_cherry_pick,
             "24": self.action_worktree_add,
             "25": self.action_gitignore_add,
+            "25a": self.action_untrack_file,
             "26": self.action_commit_search,
             "27": self.action_switch_project,
             "28": self.action_branch_age_report,
